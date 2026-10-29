@@ -1,0 +1,1902 @@
+{
+ "scenario": "umbrella-alpha",
+ "about": "Umbrella accounts: Alpha Fund read from its own columns, with the sub-fund to total cast.",
+ "settingsSig": "{\"threshold\":250000,\"highMultiple\":4,\"feeRatePct\":null,\"feeMonths\":12,\"varianceMode\":\"library\",\"investigatePct\":30,\"explainPct\":15,\"narrative\":true,\"rules\":{\"CHK-01\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-02\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-03\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-04\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-05\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-06\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-07\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-08\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-10\":{\"on\":true,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-11\":{\"on\":true,\"tol\":null,\"tolKind\":\"threshold\"},\"CHK-09\":{\"on\":false,\"tol\":1,\"tolKind\":\"abs\"},\"CHK-12\":{\"on\":true,\"tol\":null,\"tolKind\":\"exact\"},\"CHK-13\":{\"on\":false,\"tol\":null,\"tolKind\":\"completeness\"},\"CHK-14\":{\"on\":true,\"tol\":null,\"tolKind\":\"exact\"}},\"id\":\"eng-1\",\"entityId\":\"ent-1\",\"umbrella\":\"on\",\"umbrellaName\":\"Alpha Fund\"}",
+ "ticks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8
+ ],
+ "aiCalls": [],
+ "result": {
+  "docs": {
+   "cy": {
+    "name": "Draft Financial Statements",
+    "tag": "Draft",
+    "sub": "Umbrella_draft_FS.pdf",
+    "title": "Draft Financial Statements",
+    "meta": "read without AI · 3 statements, 6 tables · Alpha Fund (umbrella accounts)",
+    "blocks": [
+     {
+      "k": "para",
+      "text": "Umbrella Fund ICAV: Draft Financial Statements Year ended 31 December 2025 · prepared by the administrator"
+     },
+     {
+      "k": "head",
+      "title": "Statement of Financial Position",
+      "sub": "As at 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2025",
+       "2024"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Financial assets at fair value through profit or loss",
+        "v": [
+         486214905,
+         412806110
+        ]
+       },
+       {
+        "l": "Cash and cash equivalents",
+        "v": [
+         12480331,
+         9942210
+        ],
+        "flag": "RP-05"
+       },
+       {
+        "l": "Receivable for investments sold",
+        "v": [
+         3150000,
+         1120000
+        ]
+       },
+       {
+        "l": "Dividends and interest receivable",
+        "v": [
+         1204776,
+         756540
+        ]
+       },
+       {
+        "l": "Subscriptions receivable",
+        "v": [
+         2000000,
+         null
+        ]
+       },
+       {
+        "l": "Total assets",
+        "v": [
+         505050012,
+         424624860
+        ],
+        "b": true
+       },
+       {
+        "l": "Liabilities",
+        "h": true
+       },
+       {
+        "l": "Payable for investments purchased",
+        "v": [
+         4062000,
+         3540000
+        ]
+       },
+       {
+        "l": "Management fee payable",
+        "v": [
+         612880,
+         520300
+        ]
+       },
+       {
+        "l": "Administration and depositary fees payable",
+        "v": [
+         148400,
+         132000
+        ]
+       },
+       {
+        "l": "Audit fee payable",
+        "v": [
+         46000,
+         88000
+        ]
+       },
+       {
+        "l": "Redemptions payable",
+        "v": [
+         1750000,
+         838000
+        ]
+       },
+       {
+        "l": "Total liabilities",
+        "v": [
+         6619280,
+         5118300
+        ],
+        "b": true
+       },
+       {
+        "l": "Net assets attributable to holders of redeemable participating shares",
+        "v": [
+         498430732,
+         419506560
+        ],
+        "b": true
+       },
+       {
+        "l": "Redeemable participating shares in issue",
+        "v": [
+         4300000,
+         3780000
+        ]
+       },
+       {
+        "l": "Net asset value per share",
+        "v": [
+         115.9141,
+         110.9805
+        ],
+        "dp": 4
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Statement of Comprehensive Income",
+      "sub": "Year ended 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2025",
+       "2024"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Dividend income",
+        "v": [
+         8942110,
+         7441220
+        ]
+       },
+       {
+        "l": "Interest income",
+        "v": [
+         2406880,
+         1308440
+        ]
+       },
+       {
+        "l": "Net realised gain on financial assets at FVTPL",
+        "v": [
+         21480905,
+         9204110
+        ]
+       },
+       {
+        "l": "Net change in unrealised gain on financial assets at FVTPL",
+        "v": [
+         34215660,
+         18760440
+        ]
+       },
+       {
+        "l": "Total investment income",
+        "v": [
+         67045555,
+         36714210
+        ],
+        "b": true
+       },
+       {
+        "l": "Operating expenses",
+        "v": [
+         -5300960,
+         -4508300
+        ]
+       },
+       {
+        "l": "Net operating profit",
+        "v": [
+         61744595,
+         32205910
+        ],
+        "b": true
+       },
+       {
+        "l": "Withholding tax on investment income",
+        "v": [
+         -1206440,
+         -1004220
+        ]
+       },
+       {
+        "l": "Increase in net assets from operations",
+        "v": [
+         60538155,
+         31201690
+        ],
+        "b": true
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Statement of Changes in Net Assets",
+      "sub": "Year ended 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2025",
+       "2024"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Net assets at the beginning of the year",
+        "v": [
+         419506560,
+         379904870
+        ]
+       },
+       {
+        "l": "Increase in net assets from operations",
+        "v": [
+         60538155,
+         31201690
+        ],
+        "b": true
+       },
+       {
+        "l": "Subscriptions",
+        "v": [
+         62410000,
+         56200000
+        ]
+       },
+       {
+        "l": "Redemptions",
+        "v": [
+         -44023983,
+         -47800000
+        ]
+       },
+       {
+        "l": "Net assets at the end of the year",
+        "v": [
+         498430732,
+         419506560
+        ],
+        "b": true
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Note 3 — Operating Expenses",
+      "sub": "Year ended 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2025",
+       "2024"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Management fees",
+        "v": [
+         3684220,
+         3102880
+        ],
+        "flag": "RP-04"
+       },
+       {
+        "l": "Administration fees",
+        "v": [
+         612400,
+         548900
+        ]
+       },
+       {
+        "l": "Depositary fees",
+        "v": [
+         284900,
+         246300
+        ]
+       },
+       {
+        "l": "Audit fees",
+        "v": [
+         92000,
+         88000
+        ]
+       },
+       {
+        "l": "Directors' fees",
+        "v": [
+         78000,
+         72000
+        ]
+       },
+       {
+        "l": "Transaction costs",
+        "v": [
+         402660,
+         318220
+        ]
+       },
+       {
+        "l": "Other operating expenses",
+        "v": [
+         146780,
+         132000
+        ]
+       },
+       {
+        "l": "Total operating expenses",
+        "v": [
+         5300960,
+         4508300
+        ],
+        "b": true
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Note 4 — Financial Assets at Fair Value Through Profit or Loss",
+      "sub": "As at 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2025",
+       "2024"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Equities — North America",
+        "v": [
+         214860400,
+         176410000
+        ]
+       },
+       {
+        "l": "Equities — Europe",
+        "v": [
+         119635200,
+         96220110
+        ]
+       },
+       {
+        "l": "Equities — Asia Pacific",
+        "v": [
+         74210600,
+         58940000
+        ]
+       },
+       {
+        "l": "Government bonds",
+        "v": [
+         48300000,
+         52300000
+        ]
+       },
+       {
+        "l": "Corporate bonds",
+        "v": [
+         21150000,
+         21600000
+        ]
+       },
+       {
+        "l": "Money market funds",
+        "v": [
+         9258705,
+         7336000
+        ]
+       },
+       {
+        "l": "Total financial assets at FVTPL",
+        "v": [
+         487414905,
+         412806110
+        ],
+        "b": true,
+        "flag": "RP-01"
+       }
+      ]
+     },
+     {
+      "k": "para",
+      "text": "All investments are held by the depositary and are stated at fair value. A detailed schedule of investments is available to shareholders on request."
+     },
+     {
+      "k": "head",
+      "title": "Note 5 — Fair Value Hierarchy",
+      "sub": "As at 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "Level 1",
+       "Level 2",
+       "Level 3",
+       "Total"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "31 December 2025",
+        "v": [
+         476956200,
+         9258705,
+         0,
+         486214905
+        ]
+       },
+       {
+        "l": "31 December 2024",
+        "v": [
+         392565810,
+         7336000,
+         12904300,
+         412806110
+        ]
+       }
+      ]
+     },
+     {
+      "k": "para",
+      "text": "The Fund holds one unlisted equity investment, valued at £12,904,300 and representing 3.1% of net assets, which is classified within Level 3 of the fair value hierarchy. The valuation is based on the price of a recent transaction in the shares of the investee and was reviewed and approved by the Directors at their meeting on 12 November 2024. There were no transfers between levels of the hierarchy during the year."
+     },
+     {
+      "k": "head",
+      "title": "Note 6 — Related Party Transactions",
+      "sub": "Year ended 31 December 2025"
+     },
+     {
+      "k": "para",
+      "text": "The Investment Manager is entitled to a management fee of 0.75% per annum of the net asset value of the Fund, accrued at each valuation point and payable monthly in arrears. The Directors of the ICAV throughout the year were M. Ferreira, S. Ojo and D. Kavanagh. Directors' fees of £78,000 (2024: £72,000) were charged in the year, of which none was outstanding at the year end."
+     },
+     {
+      "k": "head",
+      "title": "Note 8 — Distributions",
+      "sub": "Year ended 31 December 2025"
+     },
+     {
+      "k": "para",
+      "text": "No distributions were declared or paid in respect of the year ended 31 December 2025 (2024: EUR 0.35 per share, EUR 1,323,000 in aggregate)."
+     },
+     {
+      "k": "head",
+      "title": "Note 12 — Events After the Reporting Date",
+      "sub": ""
+     },
+     {
+      "k": "para",
+      "text": "Note added in draft v2 The Directors are not aware of any events since the reporting date that require adjustment to, or disclosure in, these financial statements."
+     }
+    ],
+    "umbrellaCast": [
+     {
+      "where": "Financial assets at fair value through profit or loss",
+      "col": "Total 2025",
+      "stated": 729322358,
+      "comp": 729322358,
+      "ok": true
+     },
+     {
+      "where": "Cash and cash equivalents",
+      "col": "Total 2025",
+      "stated": 18725497,
+      "comp": 18720497,
+      "ok": false
+     },
+     {
+      "where": "Receivable for investments sold",
+      "col": "Total 2025",
+      "stated": 4725000,
+      "comp": 4725000,
+      "ok": true
+     },
+     {
+      "where": "Dividends and interest receivable",
+      "col": "Total 2025",
+      "stated": 1807164,
+      "comp": 1807164,
+      "ok": true
+     },
+     {
+      "where": "Subscriptions receivable",
+      "col": "Total 2025",
+      "stated": 3000000,
+      "comp": 3000000,
+      "ok": true
+     },
+     {
+      "where": "Total assets",
+      "col": "Total 2025",
+      "stated": 757575018,
+      "comp": 757575018,
+      "ok": true
+     },
+     {
+      "where": "Payable for investments purchased",
+      "col": "Total 2025",
+      "stated": 6093000,
+      "comp": 6093000,
+      "ok": true
+     },
+     {
+      "where": "Management fee payable",
+      "col": "Total 2025",
+      "stated": 919320,
+      "comp": 919320,
+      "ok": true
+     },
+     {
+      "where": "Administration and depositary fees payable",
+      "col": "Total 2025",
+      "stated": 222600,
+      "comp": 222600,
+      "ok": true
+     },
+     {
+      "where": "Audit fee payable",
+      "col": "Total 2025",
+      "stated": 69000,
+      "comp": 69000,
+      "ok": true
+     },
+     {
+      "where": "Redemptions payable",
+      "col": "Total 2025",
+      "stated": 2625000,
+      "comp": 2625000,
+      "ok": true
+     },
+     {
+      "where": "Total liabilities",
+      "col": "Total 2025",
+      "stated": 9928920,
+      "comp": 9928920,
+      "ok": true
+     },
+     {
+      "where": "Net assets attributable to holders of redeemable participating shares",
+      "col": "Total 2025",
+      "stated": 747646098,
+      "comp": 747646098,
+      "ok": true
+     },
+     {
+      "where": "Redeemable participating shares in issue",
+      "col": "Total 2025",
+      "stated": 6450000,
+      "comp": 6450000,
+      "ok": true
+     },
+     {
+      "where": "Net asset value per share",
+      "col": "Total 2025",
+      "stated": 173.9141,
+      "comp": 173.91410000000002,
+      "ok": true
+     },
+     {
+      "where": "Financial assets at fair value through profit or loss",
+      "col": "Total 2024",
+      "stated": 619209165,
+      "comp": 619209165,
+      "ok": true
+     },
+     {
+      "where": "Cash and cash equivalents",
+      "col": "Total 2024",
+      "stated": 14913315,
+      "comp": 14913315,
+      "ok": true
+     },
+     {
+      "where": "Receivable for investments sold",
+      "col": "Total 2024",
+      "stated": 1680000,
+      "comp": 1680000,
+      "ok": true
+     },
+     {
+      "where": "Dividends and interest receivable",
+      "col": "Total 2024",
+      "stated": 1134810,
+      "comp": 1134810,
+      "ok": true
+     },
+     {
+      "where": "Total assets",
+      "col": "Total 2024",
+      "stated": 636937290,
+      "comp": 636937290,
+      "ok": true
+     },
+     {
+      "where": "Payable for investments purchased",
+      "col": "Total 2024",
+      "stated": 5310000,
+      "comp": 5310000,
+      "ok": true
+     },
+     {
+      "where": "Management fee payable",
+      "col": "Total 2024",
+      "stated": 780450,
+      "comp": 780450,
+      "ok": true
+     },
+     {
+      "where": "Administration and depositary fees payable",
+      "col": "Total 2024",
+      "stated": 198000,
+      "comp": 198000,
+      "ok": true
+     },
+     {
+      "where": "Audit fee payable",
+      "col": "Total 2024",
+      "stated": 132000,
+      "comp": 132000,
+      "ok": true
+     },
+     {
+      "where": "Redemptions payable",
+      "col": "Total 2024",
+      "stated": 1257000,
+      "comp": 1257000,
+      "ok": true
+     },
+     {
+      "where": "Total liabilities",
+      "col": "Total 2024",
+      "stated": 7677450,
+      "comp": 7677450,
+      "ok": true
+     },
+     {
+      "where": "Net assets attributable to holders of redeemable participating shares",
+      "col": "Total 2024",
+      "stated": 629259840,
+      "comp": 629259840,
+      "ok": true
+     },
+     {
+      "where": "Redeemable participating shares in issue",
+      "col": "Total 2024",
+      "stated": 5670000,
+      "comp": 5670000,
+      "ok": true
+     },
+     {
+      "where": "Net asset value per share",
+      "col": "Total 2024",
+      "stated": 165.9805,
+      "comp": 165.9805,
+      "ok": true
+     },
+     {
+      "where": "Dividend income",
+      "col": "Total 2025",
+      "stated": 13413165,
+      "comp": 13413165,
+      "ok": true
+     },
+     {
+      "where": "Interest income",
+      "col": "Total 2025",
+      "stated": 3610320,
+      "comp": 3610320,
+      "ok": true
+     },
+     {
+      "where": "Net realised gain on financial assets at FVTPL",
+      "col": "Total 2025",
+      "stated": 32221358,
+      "comp": 32221358,
+      "ok": true
+     },
+     {
+      "where": "Net change in unrealised gain on financial assets at FVTPL",
+      "col": "Total 2025",
+      "stated": 51323490,
+      "comp": 51323490,
+      "ok": true
+     },
+     {
+      "where": "Total investment income",
+      "col": "Total 2025",
+      "stated": 100568333,
+      "comp": 100568333,
+      "ok": true
+     },
+     {
+      "where": "Operating expenses",
+      "col": "Total 2025",
+      "stated": -7951440,
+      "comp": -7951440,
+      "ok": true
+     },
+     {
+      "where": "Net operating profit",
+      "col": "Total 2025",
+      "stated": 92616893,
+      "comp": 92616893,
+      "ok": true
+     },
+     {
+      "where": "Withholding tax on investment income",
+      "col": "Total 2025",
+      "stated": -1809660,
+      "comp": -1809660,
+      "ok": true
+     },
+     {
+      "where": "Increase in net assets from operations",
+      "col": "Total 2025",
+      "stated": 90807233,
+      "comp": 90807233,
+      "ok": true
+     },
+     {
+      "where": "Dividend income",
+      "col": "Total 2024",
+      "stated": 11161830,
+      "comp": 11161830,
+      "ok": true
+     },
+     {
+      "where": "Interest income",
+      "col": "Total 2024",
+      "stated": 1962660,
+      "comp": 1962660,
+      "ok": true
+     },
+     {
+      "where": "Net realised gain on financial assets at FVTPL",
+      "col": "Total 2024",
+      "stated": 13806165,
+      "comp": 13806165,
+      "ok": true
+     },
+     {
+      "where": "Net change in unrealised gain on financial assets at FVTPL",
+      "col": "Total 2024",
+      "stated": 28140660,
+      "comp": 28140660,
+      "ok": true
+     },
+     {
+      "where": "Total investment income",
+      "col": "Total 2024",
+      "stated": 55071315,
+      "comp": 55071315,
+      "ok": true
+     },
+     {
+      "where": "Operating expenses",
+      "col": "Total 2024",
+      "stated": -6762450,
+      "comp": -6762450,
+      "ok": true
+     },
+     {
+      "where": "Net operating profit",
+      "col": "Total 2024",
+      "stated": 48308865,
+      "comp": 48308865,
+      "ok": true
+     },
+     {
+      "where": "Withholding tax on investment income",
+      "col": "Total 2024",
+      "stated": -1506330,
+      "comp": -1506330,
+      "ok": true
+     },
+     {
+      "where": "Increase in net assets from operations",
+      "col": "Total 2024",
+      "stated": 46802535,
+      "comp": 46802535,
+      "ok": true
+     },
+     {
+      "where": "Net assets at the beginning of the year",
+      "col": "Total 2025",
+      "stated": 629259840,
+      "comp": 629259840,
+      "ok": true
+     },
+     {
+      "where": "Increase in net assets from operations",
+      "col": "Total 2025",
+      "stated": 90807233,
+      "comp": 90807233,
+      "ok": true
+     },
+     {
+      "where": "Subscriptions",
+      "col": "Total 2025",
+      "stated": 93615000,
+      "comp": 93615000,
+      "ok": true
+     },
+     {
+      "where": "Redemptions",
+      "col": "Total 2025",
+      "stated": -66035974,
+      "comp": -66035974,
+      "ok": true
+     },
+     {
+      "where": "Net assets at the end of the year",
+      "col": "Total 2025",
+      "stated": 747646098,
+      "comp": 747646098,
+      "ok": true
+     },
+     {
+      "where": "Net assets at the beginning of the year",
+      "col": "Total 2024",
+      "stated": 569857305,
+      "comp": 569857305,
+      "ok": true
+     },
+     {
+      "where": "Increase in net assets from operations",
+      "col": "Total 2024",
+      "stated": 46802535,
+      "comp": 46802535,
+      "ok": true
+     },
+     {
+      "where": "Subscriptions",
+      "col": "Total 2024",
+      "stated": 84300000,
+      "comp": 84300000,
+      "ok": true
+     },
+     {
+      "where": "Redemptions",
+      "col": "Total 2024",
+      "stated": -71700000,
+      "comp": -71700000,
+      "ok": true
+     },
+     {
+      "where": "Net assets at the end of the year",
+      "col": "Total 2024",
+      "stated": 629259840,
+      "comp": 629259840,
+      "ok": true
+     },
+     {
+      "where": "Management fees",
+      "col": "Total 2025",
+      "stated": 5526330,
+      "comp": 5526330,
+      "ok": true
+     },
+     {
+      "where": "Administration fees",
+      "col": "Total 2025",
+      "stated": 918600,
+      "comp": 918600,
+      "ok": true
+     },
+     {
+      "where": "Depositary fees",
+      "col": "Total 2025",
+      "stated": 427350,
+      "comp": 427350,
+      "ok": true
+     },
+     {
+      "where": "Audit fees",
+      "col": "Total 2025",
+      "stated": 138000,
+      "comp": 138000,
+      "ok": true
+     },
+     {
+      "where": "Directors' fees",
+      "col": "Total 2025",
+      "stated": 117000,
+      "comp": 117000,
+      "ok": true
+     },
+     {
+      "where": "Transaction costs",
+      "col": "Total 2025",
+      "stated": 603990,
+      "comp": 603990,
+      "ok": true
+     },
+     {
+      "where": "Other operating expenses",
+      "col": "Total 2025",
+      "stated": 220170,
+      "comp": 220170,
+      "ok": true
+     },
+     {
+      "where": "Total operating expenses",
+      "col": "Total 2025",
+      "stated": 7951440,
+      "comp": 7951440,
+      "ok": true
+     },
+     {
+      "where": "Management fees",
+      "col": "Total 2024",
+      "stated": 4654320,
+      "comp": 4654320,
+      "ok": true
+     },
+     {
+      "where": "Administration fees",
+      "col": "Total 2024",
+      "stated": 823350,
+      "comp": 823350,
+      "ok": true
+     },
+     {
+      "where": "Depositary fees",
+      "col": "Total 2024",
+      "stated": 369450,
+      "comp": 369450,
+      "ok": true
+     },
+     {
+      "where": "Audit fees",
+      "col": "Total 2024",
+      "stated": 132000,
+      "comp": 132000,
+      "ok": true
+     },
+     {
+      "where": "Directors' fees",
+      "col": "Total 2024",
+      "stated": 108000,
+      "comp": 108000,
+      "ok": true
+     },
+     {
+      "where": "Transaction costs",
+      "col": "Total 2024",
+      "stated": 477330,
+      "comp": 477330,
+      "ok": true
+     },
+     {
+      "where": "Other operating expenses",
+      "col": "Total 2024",
+      "stated": 198000,
+      "comp": 198000,
+      "ok": true
+     },
+     {
+      "where": "Total operating expenses",
+      "col": "Total 2024",
+      "stated": 6762450,
+      "comp": 6762450,
+      "ok": true
+     },
+     {
+      "where": "Equities — North America",
+      "col": "Total 2025",
+      "stated": 322290600,
+      "comp": 322290600,
+      "ok": true
+     },
+     {
+      "where": "Equities — Europe",
+      "col": "Total 2025",
+      "stated": 179452800,
+      "comp": 179452800,
+      "ok": true
+     },
+     {
+      "where": "Equities — Asia Pacific",
+      "col": "Total 2025",
+      "stated": 111315900,
+      "comp": 111315900,
+      "ok": true
+     },
+     {
+      "where": "Government bonds",
+      "col": "Total 2025",
+      "stated": 72450000,
+      "comp": 72450000,
+      "ok": true
+     },
+     {
+      "where": "Corporate bonds",
+      "col": "Total 2025",
+      "stated": 31725000,
+      "comp": 31725000,
+      "ok": true
+     },
+     {
+      "where": "Money market funds",
+      "col": "Total 2025",
+      "stated": 13888058,
+      "comp": 13888058,
+      "ok": true
+     },
+     {
+      "where": "Total financial assets at FVTPL",
+      "col": "Total 2025",
+      "stated": 731122358,
+      "comp": 731122358,
+      "ok": true
+     },
+     {
+      "where": "Equities — North America",
+      "col": "Total 2024",
+      "stated": 264615000,
+      "comp": 264615000,
+      "ok": true
+     },
+     {
+      "where": "Equities — Europe",
+      "col": "Total 2024",
+      "stated": 144330165,
+      "comp": 144330165,
+      "ok": true
+     },
+     {
+      "where": "Equities — Asia Pacific",
+      "col": "Total 2024",
+      "stated": 88410000,
+      "comp": 88410000,
+      "ok": true
+     },
+     {
+      "where": "Government bonds",
+      "col": "Total 2024",
+      "stated": 78450000,
+      "comp": 78450000,
+      "ok": true
+     },
+     {
+      "where": "Corporate bonds",
+      "col": "Total 2024",
+      "stated": 32400000,
+      "comp": 32400000,
+      "ok": true
+     },
+     {
+      "where": "Money market funds",
+      "col": "Total 2024",
+      "stated": 11004000,
+      "comp": 11004000,
+      "ok": true
+     },
+     {
+      "where": "Total financial assets at FVTPL",
+      "col": "Total 2024",
+      "stated": 619209165,
+      "comp": 619209165,
+      "ok": true
+     }
+    ]
+   },
+   "py": {
+    "name": "Signed Prior Year Accounts",
+    "tag": "2024",
+    "sub": "Umbrella_signed_FS.pdf",
+    "title": "Signed Financial Statements",
+    "meta": "read without AI · 2 statements, 2 tables · Alpha Fund",
+    "blocks": [
+     {
+      "k": "para",
+      "text": "Signed Financial Statements Year ended 31 December 2024 · unqualified audit report · signed 24 April 2025"
+     },
+     {
+      "k": "head",
+      "title": "Statement of Financial Position",
+      "sub": "As at 31 December · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2024",
+       "2023"
+      ],
+      "label": "Assets",
+      "rows": [
+       {
+        "l": "Financial assets at fair value through profit or loss",
+        "v": [
+         412806110,
+         371240880
+        ]
+       },
+       {
+        "l": "Cash and cash equivalents",
+        "v": [
+         9942210,
+         11206540
+        ]
+       },
+       {
+        "l": "Receivable for investments sold",
+        "v": [
+         1120000,
+         1406240
+        ]
+       },
+       {
+        "l": "Dividends and interest receivable",
+        "v": [
+         756540,
+         756540
+        ]
+       },
+       {
+        "l": "Total assets",
+        "v": [
+         424624860,
+         384610200
+        ],
+        "b": true
+       },
+       {
+        "l": "Total liabilities",
+        "v": [
+         5118300,
+         4705330
+        ],
+        "b": true
+       },
+       {
+        "l": "Net assets attributable to holders of redeemable participating shares",
+        "v": [
+         419506560,
+         379904870
+        ],
+        "b": true
+       },
+       {
+        "l": "Net asset value per share",
+        "v": [
+         110.9805,
+         106.4213
+        ],
+        "dp": 4
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Statement of Comprehensive Income",
+      "sub": "Year ended 31 December 2024 · GBP"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "2024"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Dividend income",
+        "v": [
+         7441220
+        ]
+       },
+       {
+        "l": "Interest income",
+        "v": [
+         1308440
+        ]
+       },
+       {
+        "l": "Net realised gain on financial assets at FVTPL",
+        "v": [
+         9204110
+        ]
+       },
+       {
+        "l": "Net change in unrealised gain on financial assets at FVTPL",
+        "v": [
+         18760440
+        ]
+       },
+       {
+        "l": "Total investment income",
+        "v": [
+         36714210
+        ],
+        "b": true
+       },
+       {
+        "l": "Total operating expenses",
+        "v": [
+         -4508300
+        ],
+        "b": true
+       },
+       {
+        "l": "Increase in net assets from operations",
+        "v": [
+         31201690
+        ],
+        "b": true
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Note 5 — Fair Value Hierarchy",
+      "sub": "As at 31 December 2024"
+     },
+     {
+      "k": "para",
+      "text": "The Fund holds one unlisted equity investment, valued at £12,904,300 and representing 3.1% of net assets, which is classified within Level 3 of the fair value hierarchy. The valuation is based on the price of a recent transaction in the shares of the investee and was reviewed and approved by the Directors at their meeting on 12 November 2024. There were no transfers between levels of the hierarchy during the year."
+     },
+     {
+      "k": "head",
+      "title": "Note 8 — Distributions",
+      "sub": "Year ended 31 December 2024"
+     },
+     {
+      "k": "para",
+      "text": "A distribution of £0.35 per share, £1,323,000 in aggregate, was declared and paid in respect of the year ended 31 December 2024. The functional and presentation currency of the Fund is US dollars."
+     },
+     {
+      "k": "head",
+      "title": "Note 6 — Related Party Transactions",
+      "sub": "Year ended 31 December 2024"
+     },
+     {
+      "k": "para",
+      "text": "The Directors of the ICAV throughout the year were M. Ferreira, S. Ojo and D. Kavanagh. The Investment Manager is entitled to a management fee of 0.75% per annum of the net asset value of the Fund."
+     }
+    ]
+   },
+   "tb": {
+    "name": "Trial Balance",
+    "tag": "Ledger",
+    "sub": "MGEF_TB_31Dec2025.xlsx",
+    "title": "Trial Balance",
+    "meta": "As at 31 December 2025 · read from “TB 31Dec2025” without AI · 25 accounts",
+    "blocks": [
+     {
+      "k": "table",
+      "cols": [
+       "Debit",
+       "Credit"
+      ],
+      "label": "Account",
+      "rows": [
+       {
+        "l": "Financial assets at fair value through profit or loss",
+        "ref": "1010",
+        "v": [
+         486214905,
+         null
+        ]
+       },
+       {
+        "l": "Cash at bank — GBP operating account",
+        "ref": "1020",
+        "v": [
+         12480331,
+         null
+        ]
+       },
+       {
+        "l": "Receivable for investments sold",
+        "ref": "1030",
+        "v": [
+         3150000,
+         null
+        ]
+       },
+       {
+        "l": "Dividends and interest receivable",
+        "ref": "1040",
+        "v": [
+         1204776,
+         null
+        ]
+       },
+       {
+        "l": "Subscriptions receivable",
+        "ref": "1050",
+        "v": [
+         2000000,
+         null
+        ]
+       },
+       {
+        "l": "Payable for investments purchased",
+        "ref": "2010",
+        "v": [
+         null,
+         4062000
+        ]
+       },
+       {
+        "l": "Management fee payable",
+        "ref": "2020",
+        "v": [
+         null,
+         612880
+        ]
+       },
+       {
+        "l": "Administration and depositary fees payable",
+        "ref": "2030",
+        "v": [
+         null,
+         148400
+        ]
+       },
+       {
+        "l": "Audit fee payable",
+        "ref": "2040",
+        "v": [
+         null,
+         46000
+        ]
+       },
+       {
+        "l": "Redemptions payable",
+        "ref": "2050",
+        "v": [
+         null,
+         1750000
+        ]
+       },
+       {
+        "l": "Net assets brought forward",
+        "ref": "3010",
+        "v": [
+         null,
+         419506560
+        ]
+       },
+       {
+        "l": "Subscriptions received",
+        "ref": "3020",
+        "v": [
+         null,
+         62410000
+        ]
+       },
+       {
+        "l": "Redemptions paid",
+        "ref": "3030",
+        "v": [
+         44023983,
+         null
+        ]
+       },
+       {
+        "l": "Dividend income",
+        "ref": "4010",
+        "v": [
+         null,
+         8942110
+        ]
+       },
+       {
+        "l": "Interest income",
+        "ref": "4020",
+        "v": [
+         null,
+         2406880
+        ]
+       },
+       {
+        "l": "Net realised gain on investments",
+        "ref": "4030",
+        "v": [
+         null,
+         21480905
+        ]
+       },
+       {
+        "l": "Net change in unrealised gain on investments",
+        "ref": "4040",
+        "v": [
+         null,
+         34215660
+        ]
+       },
+       {
+        "l": "Management fees",
+        "ref": "5010",
+        "v": [
+         3684220,
+         null
+        ]
+       },
+       {
+        "l": "Administration fees",
+        "ref": "5020",
+        "v": [
+         612400,
+         null
+        ]
+       },
+       {
+        "l": "Depositary fees",
+        "ref": "5030",
+        "v": [
+         284900,
+         null
+        ]
+       },
+       {
+        "l": "Audit fees",
+        "ref": "5040",
+        "v": [
+         92000,
+         null
+        ]
+       },
+       {
+        "l": "Directors' fees",
+        "ref": "5050",
+        "v": [
+         78000,
+         null
+        ]
+       },
+       {
+        "l": "Transaction costs",
+        "ref": "5060",
+        "v": [
+         402660,
+         null
+        ]
+       },
+       {
+        "l": "Other operating expenses",
+        "ref": "5070",
+        "v": [
+         146780,
+         null
+        ]
+       },
+       {
+        "l": "Withholding tax on investment income",
+        "ref": "5080",
+        "v": [
+         1206440,
+         null
+        ]
+       },
+       {
+        "l": "Totals",
+        "b": true,
+        "v": [
+         555581395,
+         555581395
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "is": {
+    "name": "Investment Schedule",
+    "tag": "Custodian",
+    "sub": "Custodian_valuation_31Dec2025.xlsx",
+    "title": "Schedule of Investments",
+    "meta": "Custodian valuation at 31 December 2025 · read without AI · 6 asset classes · 6 holdings",
+    "blocks": [
+     {
+      "k": "head",
+      "title": "By Asset Class",
+      "sub": "As printed on “Summary”"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "Fair value"
+      ],
+      "label": "Asset class",
+      "rows": [
+       {
+        "l": "Equities — North America",
+        "ref": "IS-1",
+        "v": [
+         214860400
+        ]
+       },
+       {
+        "l": "Equities — Europe",
+        "ref": "IS-2",
+        "v": [
+         118435200
+        ]
+       },
+       {
+        "l": "Equities — Asia Pacific",
+        "ref": "IS-3",
+        "v": [
+         74210600
+        ]
+       },
+       {
+        "l": "Government bonds",
+        "ref": "IS-4",
+        "v": [
+         48300000
+        ]
+       },
+       {
+        "l": "Corporate bonds",
+        "ref": "IS-5",
+        "v": [
+         21150000
+        ]
+       },
+       {
+        "l": "Money market funds",
+        "ref": "IS-6",
+        "v": [
+         9258705
+        ]
+       },
+       {
+        "l": "Total investments at fair value",
+        "b": true,
+        "v": [
+         486214905
+        ]
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "By Fair Value Level",
+      "sub": "Added up from the holdings"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "Fair value"
+      ],
+      "label": "Level",
+      "rows": [
+       {
+        "l": "Level 1",
+        "v": [
+         99838000
+        ]
+       },
+       {
+        "l": "Level 2",
+        "v": [
+         13905400
+        ]
+       },
+       {
+        "l": "Level 3",
+        "v": [
+         0
+        ]
+       },
+       {
+        "l": "Total",
+        "b": true,
+        "v": [
+         113743400
+        ]
+       }
+      ]
+     },
+     {
+      "k": "head",
+      "title": "Holdings",
+      "sub": "6 holdings"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "Fair value"
+      ],
+      "label": "Holding",
+      "rows": [
+       {
+        "l": "Halden Semiconductor Corp",
+        "v": [
+         26410800
+        ]
+       },
+       {
+        "l": "Northbank Financial Group",
+        "v": [
+         21806400
+        ]
+       },
+       {
+        "l": "US Treasury 3.875% 2029",
+        "v": [
+         19400000
+        ]
+       },
+       {
+        "l": "Vantière Industries SA",
+        "v": [
+         17240600
+        ]
+       },
+       {
+        "l": "Kanto Precision KK",
+        "v": [
+         14980200
+        ]
+       },
+       {
+        "l": "Bruckner Energie AG",
+        "v": [
+         13905400
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   "sup": {
+    "name": "Supporting Information",
+    "tag": "Support",
+    "sub": "Board_minutes_and_prospectus.pdf",
+    "title": "Supporting Information",
+    "meta": "read without AI · 1 section · management fee 0.75%",
+    "blocks": [
+     {
+      "k": "para",
+      "text": "Supporting Information Board minutes, prospectus extracts and manager correspondence"
+     },
+     {
+      "k": "head",
+      "title": "Prospectus Extract — Fees",
+      "sub": ""
+     },
+     {
+      "k": "para",
+      "text": "SUP-1 The Investment Manager shall be entitled to a management fee of 0.75% per annum of the net asset value of the Fund, accrued at each valuation point and payable monthly in arrears. No performance fee is payable. Administration and depositary fees are charged at 0.13% and 0.06% per annum respectively. Net Asset Value Analysis SUP-2 · GBP Measure Amount"
+     },
+     {
+      "k": "table",
+      "cols": [
+       "Value 1"
+      ],
+      "label": "",
+      "rows": [
+       {
+        "l": "Net assets at 1 January 2025",
+        "v": [
+         419506560
+        ]
+       },
+       {
+        "l": "Net assets at 31 December 2025",
+        "v": [
+         498430732
+        ]
+       },
+       {
+        "l": "Average of opening and closing net assets",
+        "v": [
+         458968646
+        ]
+       },
+       {
+        "l": "Management fee at 0.75% of average net assets",
+        "v": [
+         3442265
+        ]
+       },
+       {
+        "l": "Management fee charged per Note 3",
+        "v": [
+         3684220
+        ]
+       }
+      ]
+     },
+     {
+      "k": "para",
+      "text": "Board Minutes — 14 February 2025 SUP-3 D. Kavanagh tendered his resignation as a Director of the ICAV with immediate effect. The Board accepted the resignation and appointed S. Ojo as chair. No replacement director was appointed before the year end. Board Minutes — 18 February 2026 SUP-4 The administrator reported a redemption request of £25,000,000 received from a single shareholder on 11 February 2026, representing 5.02% of net assets at 31 December 2025. The request will be met from the 31 March 2026 dealing date and is expected to be funded from the disposal of North American equities. Manager Commentary — Bond Portfolio SUP-5 The bond allocation was reduced by approximately 6% over the year, from £73,900,000 to £69,450,000, with proceeds recycled into North American equities. The commentary does not address yield, coupon reset dates or any change in the mix of instruments held. Custodian Valuation Report — Europe SUP-6 European equity holdings at 31 December 2025 are valued at £118,435,200 in aggregate. The report is dated 6 January 2026 and is signed off by the depositary's valuation team. No adjustment or true-up has been notified since that date."
+     }
+    ]
+   }
+  },
+  "K": {
+   "mgmtRate": 0.0075,
+   "ca": [
+    486214905,
+    12480331,
+    3150000,
+    1204776,
+    2000000
+   ],
+   "cl": [
+    4062000,
+    612880,
+    148400,
+    46000,
+    1750000
+   ],
+   "statedTA": 505050012,
+   "statedNA": 498430732,
+   "income": [
+    8942110,
+    2406880,
+    21480905,
+    34215660
+   ],
+   "statedIncome": 67045555,
+   "sciExp": 5300960,
+   "ops": 60538155,
+   "pyNA": 419506560,
+   "pyOpenNA": 379904870,
+   "subs": 62410000,
+   "reds": 44023983,
+   "dists": 0,
+   "exp": [
+    3684220,
+    612400,
+    284900,
+    92000,
+    78000,
+    402660,
+    146780
+   ],
+   "mgmtCharged": 3684220,
+   "statedNote4": 487414905,
+   "hier": [
+    476956200,
+    9258705,
+    0
+   ],
+   "tbDr": 555581395,
+   "tbCr": 555581395,
+   "sched": [
+    214860400,
+    118435200,
+    74210600,
+    48300000,
+    21150000,
+    9258705
+   ]
+  },
+  "points": [
+   {
+    "pri": "High",
+    "area": "Investments",
+    "title": "Investment note agrees to the custodian schedule — difference of £1,200,000",
+    "basis": "Recomputed 486,214,905 against 487,414,905 per the accounts, a difference of 1,200,000. Schedule total against the Note 4 total.",
+    "amount": 1200000,
+    "refs": "Note 4 · Investment schedule",
+    "follow": "Obtain a revised investment note agreed to the custodian valuation report.",
+    "anchor": "Total financial assets at FVTPL",
+    "rule": "CHK-07",
+    "source": "check",
+    "ref": "RP-01",
+    "status": "open",
+    "agent": "new",
+    "agentNote": "Raised on this version."
+   },
+   {
+    "pri": "Medium",
+    "area": "Presentation",
+    "title": "Amounts are in the presentation currency: 2 found",
+    "basis": "2 amounts in EUR in GBP accounts, first: “…r paid in respect of the year ended 31 December 2025 (2024: EUR 0.35 per share, EUR 1,323,000 in agg…”.",
+    "amount": null,
+    "refs": "Notes",
+    "follow": "Restate the amounts in the presentation currency, or label any foreign currency amount clearly with its conversion.",
+    "anchor": "EUR 0.35",
+    "rule": "CHK-14",
+    "source": "check",
+    "ref": "RP-02",
+    "status": "open",
+    "agent": "new",
+    "agentNote": "Raised on this version."
+   },
+   {
+    "pri": "Medium",
+    "area": "Narrative",
+    "title": "Dates in the narrative belong to this year: 1 found",
+    "basis": "1 date from another year, first: 12 November 2024: this approval is dated before this financial year began; check the wording hasn’t been carried forward from last year.",
+    "amount": null,
+    "refs": "Notes",
+    "follow": "Update the date, or confirm it is correct and explain it.",
+    "anchor": "approved by the Directors at their meeting on 12 November 2024",
+    "rule": "CHK-12",
+    "source": "check",
+    "ref": "RP-03",
+    "status": "open",
+    "agent": "new",
+    "agentNote": "Raised on this version."
+   },
+   {
+    "pri": "Low",
+    "area": "Expenses",
+    "title": "Management fee at the prospectus rate — difference of £241,955",
+    "basis": "Recomputed 3,442,265 against 3,684,220 per the accounts, a difference of 241,955. Average net assets 458,968,646 at 0.75% for 12 months.",
+    "amount": 241955,
+    "refs": "Note 3 · Prospectus",
+    "follow": "Obtain the monthly fee computation and recompute two months on the valuation-point net asset value.",
+    "anchor": "Management fees",
+    "rule": "CHK-10",
+    "source": "check",
+    "ref": "RP-04",
+    "status": "open",
+    "agent": "new",
+    "agentNote": "Raised on this version."
+   },
+   {
+    "pri": "Low",
+    "area": "Primary statements",
+    "title": "Sub-funds add up to the umbrella totals — difference of £5,000",
+    "basis": "Recomputed 18,720,497 against 18,725,497 per the accounts, a difference of 5,000. 87 umbrella totals checked; 1 does not equal the sum of the sub-funds, first is Cash and cash equivalents (Total 2025).",
+    "amount": 5000,
+    "refs": "Umbrella statements",
+    "follow": "Correct the umbrella total column, or the sub-fund column that is wrong.",
+    "anchor": "Cash and cash equivalents",
+    "rule": "CHK-03",
+    "source": "check",
+    "ref": "RP-05",
+    "status": "open",
+    "agent": "new",
+    "agentNote": "Raised on this version."
+   }
+  ],
+  "varNotes": {},
+  "version": 1,
+  "priorResolved": [],
+  "demo": false,
+  "aiSkipped": [
+   "Narrative review",
+   "Variance explanations"
+  ],
+  "aiReads": {
+   "read": [],
+   "reused": [],
+   "local": [
+    "cy",
+    "is",
+    "py",
+    "sup",
+    "tb"
+   ]
+  }
+ }
+}

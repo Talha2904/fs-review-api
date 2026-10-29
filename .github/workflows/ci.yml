@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fsreview
+          POSTGRES_PASSWORD: fsreview
+          POSTGRES_DB: fsreview
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U fsreview -d fsreview"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://fsreview:fsreview@localhost:5432/fsreview
+      # Integration tests (test/integration) run against the same fresh CI database once it is migrated.
+      DATABASE_URL_TEST: postgresql://fsreview:fsreview@localhost:5432/fsreview
+      APP_URL: http://localhost:5173
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      # node-canvas (optional) draws scanned pages for OCR; these libraries let it build when no prebuilt binary fits
+      - run: sudo apt-get update && sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev
+      - run: npm ci
+      - run: npm run build -w shared
+      - run: npm run db:generate
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run db:migrate
+      - run: npm run test:coverage
+      - run: npm run build
+
+  portability:
+    name: The schema validates and deploys on MySQL (plan section 11.3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: check
+          MYSQL_DATABASE: fsreview
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd "mysqladmin ping -uroot -pcheck"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check:portability
+        env:
+          MYSQL_URL: mysql://root:check@127.0.0.1:3306/fsreview
+
+  import-boundary:
+    name: Import boundary rule fails a deliberate bad import
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w shared
+      - run: npm run db:generate
+      - name: A use case importing Prisma must be rejected
+        run: |
+          mkdir -p src/application/_boundary_check
+          printf "import { PrismaClient } from '@prisma/client';\nexport const x = PrismaClient;\n" > src/application/_boundary_check/bad.ts
+          if npx eslint src/application/_boundary_check/bad.ts; then
+            echo "::error::The import boundary rule did not fire"; exit 1
+          else
+            echo "Boundary rule fired as expected"
+          fi
+          rm -rf src/application/_boundary_check

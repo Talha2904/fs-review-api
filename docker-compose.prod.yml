@@ -1,0 +1,49 @@
+# FS Review in containers: the database migrations, the api and the web app (nginx, which passes /api to the api).
+# The database is not in here: DATABASE_URL points at Supabase or any other Postgres (ADR 0001).
+#
+#   cp .env.example .env.production      then fill it in (production values: api/docs/OPERATIONS.md section 1)
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Expects the react-app repository beside this one (../react-app), as in the fs-review folder.
+# The web app is published on 127.0.0.1:8080 only, for a TLS proxy on the same machine (Caddy, nginx) to reach.
+# Set WEB_BIND=0.0.0.0 to open it to the network, for example behind a cloud load balancer that ends TLS.
+name: fs-review
+
+services:
+  # applies committed migrations, then exits; the api starts only if it succeeded
+  migrate:
+    build:
+      context: .
+      target: build
+    image: fs-review-api-build
+    command: ['npx', 'prisma', 'migrate', 'deploy']
+    env_file: .env.production
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      target: runtime
+    image: fs-review-api
+    env_file: .env.production
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # uploaded files (when no S3 settings are given) and the OCR cache
+    volumes:
+      - api-data:/app/data
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../react-app
+    image: fs-review-web
+    ports:
+      - '${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  api-data:

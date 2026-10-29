@@ -1,0 +1,41 @@
+# dependencies and build output (npm install and npm run build recreate them)
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.eslintcache
+*.tgz
+
+# logs
+*.log
+logs/
+
+# secrets and local settings: only .env.example is committed
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# uploaded files and the OCR cache (local disk storage)
+data/
+
+# database backups and dumps (pg_dump); keep them in the firm's backup storage, never here
+*.dump
+*.backup
+
+# scratch
+tmp/
+temp/
+
+# editor and OS
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.vscode/
+.idea/
+
+# session tooling
+.claude/launch.json
+.claude/settings.local.json

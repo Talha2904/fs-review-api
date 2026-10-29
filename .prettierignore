@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+api/prisma/migrations
+package-lock.json
+# frozen copy of the web app engine (parity reference): kept exactly as it was
+test/parity/web-engine

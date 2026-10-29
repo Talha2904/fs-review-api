@@ -1,0 +1,12 @@
+node_modules
+shared/node_modules
+dist
+shared/dist
+coverage
+data
+*.log
+.env
+.env.*
+.claude
+.vscode
+.idea

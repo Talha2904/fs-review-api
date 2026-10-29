@@ -1,0 +1,10 @@
+# Line endings stay LF in the repository and in every checkout (Prettier and .editorconfig expect LF),
+# whatever core.autocrlf is set to on the machine.
+* text=auto eol=lf
+
+# binary files: never converted or diffed as text
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.xlsx binary

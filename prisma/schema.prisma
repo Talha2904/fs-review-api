@@ -1,0 +1,517 @@
+// Prisma schema for the FS Review api.
+// Portability rules (BACKEND_PLAN.md section 11): no engine-specific native types, no database
+// defaults for ids or sequences, JSON columns written and read whole. Changing engines changes the
+// provider below and regenerates migrations; nothing outside infrastructure/db changes.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- Phase 1: identity and administration (plan section 6.1) ----------------------------------
+
+model User {
+  id                String    @id
+  name              String
+  username          String    @unique
+  email             String?
+  /// lower-cased email for case-insensitive uniqueness (portability rule: no functional indexes)
+  emailKey          String?   @unique @map("email_key")
+  role              String
+  active            Boolean   @default(true)
+  passwordHash      String    @map("password_hash")
+  passwordSalt      String    @map("password_salt")
+  createdAt         DateTime  @map("created_at")
+  lastSignInAt      DateTime? @map("last_sign_in_at")
+  passwordChangedAt DateTime? @map("password_changed_at")
+
+  sessions       Session[]
+  passwordResets PasswordReset[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String    @id
+  tokenHash String    @unique @map("token_hash")
+  userId    String    @map("user_id")
+  ip        String?
+  createdAt DateTime  @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Failed sign-in counter per ip|username, for the 5-in-15-minutes lockout.
+model LoginAttempt {
+  key     String   @id
+  count   Int
+  firstAt DateTime @map("first_at")
+
+  @@map("login_attempts")
+}
+
+/// Single row (id = 1): the editable permission matrix.
+model PermissionMatrix {
+  id        Int      @id
+  matrix    Json
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @map("updated_at")
+
+  @@map("permission_matrix")
+}
+
+model PasswordReset {
+  id        String    @id
+  tokenHash String    @unique @map("token_hash")
+  userId    String    @map("user_id")
+  createdAt DateTime  @map("created_at")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+/// Single row (id = 1): where the app may use Claude. The API key itself stays in the environment.
+model AiSettings {
+  id        Int      @id
+  settings  Json
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @map("updated_at")
+
+  @@map("ai_settings")
+}
+
+/// Append-only. No update or delete path exists in the application.
+model ActivityEntry {
+  id            String   @id
+  at            DateTime
+  actorId       String?  @map("actor_id")
+  actorName     String?  @map("actor_name")
+  actorUsername String?  @map("actor_username")
+  actorRole     String?  @map("actor_role")
+  category      String
+  summary       String   @db.Text
+  details       String   @db.Text
+  ip            String
+  engagementId  String?  @map("engagement_id")
+  fundName      String?  @map("fund_name")
+  /// AI calls only: { step, model, input, output }
+  usage         Json?
+
+  @@index([at(sort: Desc)])
+  @@index([engagementId, at(sort: Desc)])
+  @@map("activity")
+}
+
+/// Single row (id = 1): the whole billing state as one JSON document (Phase 1). Kept only so an
+/// existing installation is imported into the tables below on first use; new installations never write it.
+model BillingState {
+  id        Int      @id
+  state     Json
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @map("updated_at")
+
+  @@map("billing_state")
+}
+
+// ---- Phase 5: billing on tables (plan section 6.5) -------------------------------------------------
+
+/// Single row (id = 1): firm details, VAT, terms, AI prices, exchange rate, lock date, email templates, Xero codes.
+model BillingSettings {
+  id        Int      @id
+  settings  Json
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @map("updated_at")
+
+  @@map("billing_settings")
+}
+
+/// What Finance was told about a fund: a sign-off or an unlock, with the details needed to invoice.
+model BillingEvent {
+  engagementId String   @id @map("engagement_id")
+  state        String
+  fundName     String   @map("fund_name")
+  clientName   String   @map("client_name")
+  payload      Json
+  at           DateTime
+  updatedAt    DateTime @map("updated_at")
+
+  @@map("billing_events")
+}
+
+/// An invoice. `data` holds the whole document the screens use (lines, payments, write-offs, credit notes,
+/// emails, history, Xero); the columns beside it are indexed copies for reporting.
+model Invoice {
+  id           String    @id
+  number       String?   @unique
+  engagementId String    @map("engagement_id")
+  status       String
+  kind         String
+  clientName   String    @map("client_name")
+  fundName     String    @map("fund_name")
+  issuedAt     DateTime? @map("issued_at")
+  dueDate      DateTime? @map("due_date")
+  grossPence   Int       @map("gross_pence")
+  data         Json
+  createdAt    DateTime  @map("created_at")
+  updatedAt    DateTime  @map("updated_at")
+
+  transactions InvoiceTransaction[]
+
+  @@index([engagementId])
+  @@index([status])
+  @@map("invoices")
+}
+
+/// Money movements against an invoice: payments, write-offs, credit notes and cancellations. Insert only.
+model InvoiceTransaction {
+  id        String   @id
+  invoiceId String   @map("invoice_id")
+  kind      String
+  amount    Int
+  number    String?
+  reason    String   @db.Text
+  reference String   @db.Text
+  by        Json?
+  at        DateTime
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+
+  @@index([invoiceId])
+  @@map("invoice_transactions")
+}
+
+/// Invoice and credit note numbering, kept in a table under the save transaction rather than a database sequence (portability rule).
+model BillingSequence {
+  name  String @id
+  value Int
+
+  @@map("billing_sequences")
+}
+
+// ---- Phase 2: firm configuration, clients and funds (plan sections 6.2 and 6.3) -------------------
+
+/// Single row (id = 1): the firm's check-rule template { rules, overrides, custom }.
+model CheckRuleConfig {
+  id        Int      @id
+  config    Json
+  updatedBy String?  @map("updated_by")
+  updatedAt DateTime @map("updated_at")
+
+  @@map("check_rule_config")
+}
+
+/// The current disclosure checklist per accounting framework; every save is also kept in the history table.
+model ChecklistTemplate {
+  framework String   @id
+  version   String
+  items     Json
+  savedBy   String?  @map("saved_by")
+  savedAt   DateTime @map("saved_at")
+
+  @@map("checklist_templates")
+}
+
+model ChecklistTemplateVersion {
+  id        String   @id
+  framework String
+  version   String
+  items     Json
+  savedBy   String?  @map("saved_by")
+  savedAt   DateTime @map("saved_at")
+
+  @@unique([framework, version])
+  @@map("checklist_template_versions")
+}
+
+/// The legal entity funds belong to. `data` holds the whole record the screens use; the columns beside it are indexed copies.
+model Entity {
+  id          String   @id
+  name        String
+  /// lower-cased, spaces removed, for case-insensitive uniqueness (portability rule: no functional indexes)
+  nameKey     String   @unique @map("name_key")
+  clientName  String   @map("client_name")
+  framework   String
+  aiPermitted Boolean? @map("ai_permitted")
+  data        Json
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @map("created_at")
+  updatedBy   String?  @map("updated_by")
+  updatedAt   DateTime @map("updated_at")
+
+  engagements Engagement[]
+
+  @@map("entities")
+}
+
+/// A fund's year-end review. `data` holds the whole engagement document (settings, rule overrides, tb mapping).
+model Engagement {
+  id         String   @id
+  entityId   String?  @map("entity_id")
+  fundName   String   @map("fund_name")
+  yearEnd    String   @map("year_end")
+  currency   String
+  preparerId String?  @map("preparer_id")
+  reviewerId String?  @map("reviewer_id")
+  managerId  String?  @map("manager_id")
+  partnerId  String?  @map("partner_id")
+  data       Json
+  createdBy  String?  @map("created_by")
+  createdAt  DateTime @map("created_at")
+  updatedBy  String?  @map("updated_by")
+  updatedAt  DateTime @map("updated_at")
+
+  entity    Entity?              @relation(fields: [entityId], references: [id], onDelete: Restrict)
+  documents DocumentVersion[]
+  workflow  Workflow?
+  signoff   Signoff?
+  runs      AnalysisRun[]
+  jobs      AnalysisJob[]
+  points    ReviewPoint[]
+  checklist DisclosureChecklist?
+  reports   ReviewReport[]
+
+  @@index([entityId])
+  @@index([yearEnd])
+  @@map("engagements")
+}
+
+// ---- Phase 3: documents and workflow (plan section 6.4) -------------------------------------------
+
+/// One uploaded (or built-in sample) document version. The file itself is in object storage under storage_key.
+model DocumentVersion {
+  id           String    @id
+  engagementId String    @map("engagement_id")
+  slot         String
+  version      Int
+  fileName     String    @map("file_name") @db.Text
+  size         Int
+  sha256       String
+  sample       Boolean
+  storageKey   String?   @map("storage_key")
+  uploadedBy   Json?     @map("uploaded_by")
+  uploadedAt   DateTime  @map("uploaded_at")
+  removedAt    DateTime? @map("removed_at")
+  removedBy    Json?     @map("removed_by")
+  validation   Json?
+  confirmation Json?
+  readWith     String?   @map("read_with")
+  readWithBy   Json?     @map("read_with_by")
+  readWithAt   DateTime? @map("read_with_at")
+  sameAs       Int?      @map("same_as")
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@unique([engagementId, slot, version])
+  @@index([engagementId, sha256])
+  @@map("document_versions")
+}
+
+/// The documents' state for one engagement: preparing, ready (locked for review) or returned to the preparer.
+model Workflow {
+  engagementId String    @id @map("engagement_id")
+  state        String
+  by           Json?
+  at           DateTime?
+  reason       String    @db.Text
+  history      Json
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@map("workflows")
+}
+
+/// Sign-off state per engagement. Phase 3 reads it for the lock rule; Phase 4 adds the transitions.
+model Signoff {
+  engagementId String    @id @map("engagement_id")
+  state        String
+  by           Json?
+  at           DateTime?
+  text         String    @db.Text
+  summary      Json?
+  history      Json
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@map("signoffs")
+}
+
+// ---- Phase 4: analysis, review points, checklist, sign-off reports (plan section 6.4) ------------
+
+/// One analysis run, kept with the document versions it read.
+model AnalysisRun {
+  id               String   @id
+  engagementId     String   @map("engagement_id")
+  draftVersion     Int      @map("draft_version")
+  result           Json
+  analysedAt       DateTime @map("analysed_at")
+  settingsSig      String   @map("settings_sig") @db.Text
+  documentVersions Json     @map("document_versions")
+  by               Json?
+  at               DateTime
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@index([engagementId, at(sort: Desc)])
+  @@map("analysis_runs")
+}
+
+// ---- Phase 6: analysis on the server (plan section 9) -----------------------------------------------
+
+/// One analysis run requested on the api, from queued to done or failed. The result is an AnalysisRun.
+model AnalysisJob {
+  id           String    @id
+  engagementId String    @map("engagement_id")
+  /// full: analyse the current documents; nextDraft: re-test the previous result's points on a new draft
+  mode         String
+  /// queued, running, done or failed
+  status       String
+  step         Int       @default(0)
+  total        Int
+  error        String?   @db.Text
+  runId        String?   @map("run_id")
+  requestedBy  Json      @map("requested_by")
+  createdAt    DateTime  @map("created_at")
+  startedAt    DateTime? @map("started_at")
+  finishedAt   DateTime? @map("finished_at")
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@index([engagementId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("analysis_jobs")
+}
+
+/// An AI reading of one document's exact content, reused whenever the same content is analysed again.
+model DocumentReading {
+  key     String   @id
+  slot    String
+  sha256  String
+  model   String
+  reading Json
+  readBy  Json?    @map("read_by")
+  readAt  DateTime @map("read_at")
+
+  @@index([sha256])
+  @@map("document_readings")
+}
+
+model ReviewPoint {
+  id           String    @id
+  engagementId String    @map("engagement_id")
+  ref          String
+  /// content.title, kept in its own column so lists (the bell) need not read the whole content
+  title        String    @db.Text
+  source       String
+  content      Json
+  status       String
+  type         String
+  dueDate      String?   @map("due_date")
+  assignedTo   Json?     @map("assigned_to")
+  raisedBy     Json?     @map("raised_by")
+  raisedAt     DateTime  @map("raised_at")
+  clearedBy    Json?     @map("cleared_by")
+  clearedAt    DateTime? @map("cleared_at")
+  updatedAt    DateTime  @map("updated_at")
+
+  engagement Engagement      @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+  messages   PointMessage[]
+  evidence   PointEvidence[]
+
+  @@unique([engagementId, ref])
+  @@index([engagementId, status])
+  @@map("review_points")
+}
+
+/// A point's thread. Insert only: nothing edits or deletes a message.
+model PointMessage {
+  id           String   @id
+  pointId      String   @map("point_id")
+  engagementId String   @map("engagement_id")
+  kind         String
+  author       Json?
+  at           DateTime
+  text         String   @db.Text
+  attachments  Json
+
+  point ReviewPoint @relation(fields: [pointId], references: [id], onDelete: Restrict)
+
+  @@index([pointId, at])
+  @@index([engagementId, at])
+  @@map("point_messages")
+}
+
+model PointEvidence {
+  id           String   @id
+  engagementId String   @map("engagement_id")
+  pointId      String   @map("point_id")
+  fileName     String   @map("file_name") @db.Text
+  size         Int
+  sha256       String
+  storageKey   String   @map("storage_key")
+  by           Json?
+  at           DateTime
+
+  point ReviewPoint @relation(fields: [pointId], references: [id], onDelete: Restrict)
+
+  @@index([engagementId])
+  @@map("point_evidence")
+}
+
+/// The checklist a review copied when it was first answered, with its answers.
+model DisclosureChecklist {
+  engagementId String   @id @map("engagement_id")
+  framework    String
+  version      String
+  items        Json
+  answers      Json
+  updatedAt    DateTime @map("updated_at")
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@map("disclosure_checklists")
+}
+
+/// The permanent review report PDF made at each final sign-off; earlier versions are kept.
+model ReviewReport {
+  id           String    @id
+  engagementId String    @map("engagement_id")
+  version      Int
+  sha256       String
+  size         Int
+  storageKey   String    @map("storage_key")
+  by           Json?
+  at           DateTime
+  signedBy     Json?     @map("signed_by")
+  signedAt     DateTime? @map("signed_at")
+
+  engagement Engagement @relation(fields: [engagementId], references: [id], onDelete: Restrict)
+
+  @@unique([engagementId, version])
+  @@map("review_reports")
+}
+
+/// Single row (id = 1): the Xero OAuth connection.
+model XeroConnection {
+  id          Int      @id
+  tokens      Json
+  tenantId    String   @map("tenant_id")
+  tenantName  String   @map("tenant_name")
+  connectedAt DateTime @map("connected_at")
+  updatedAt   DateTime @map("updated_at")
+
+  @@map("xero_connection")
+}
