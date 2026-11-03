@@ -3,6 +3,7 @@ import { type BillingAction, type BillingActionType, type PermissionMatrix } fro
 import { AppError, forbidden, validationFailed } from '../../domain/errors.js';
 import type { Actor } from '../../domain/identity/User.js';
 import { requirePermission } from '../identity/authorize.js';
+import { invoiceEmail } from '../mail/emailLayout.js';
 import type { BillingRepository } from '../ports/BillingRepository.js';
 import type { FxRateSource } from '../ports/FxRateSource.js';
 import type { Mailer } from '../ports/Mailer.js';
@@ -85,12 +86,17 @@ export class EmailInvoice {
       .filter(Boolean);
     if (!emails.length || emails.some((e) => !EMAIL_RE.test(e))) throw validationFailed('Enter a valid email address.');
     if (!input.pdf || input.pdf.length > 15e6) throw validationFailed('The invoice PDF is missing or too large.');
+    const firmName = inv.settingsAtIssue?.firmName || '';
     try {
       await this.mailer.send({
         to: emails.join(', '),
         ...(input.cc ? { cc: input.cc } : {}),
-        subject: String(input.subject || '').slice(0, 200),
-        text: String(input.message || '').slice(0, 5000),
+        ...invoiceEmail({
+          subject: String(input.subject || '').slice(0, 200),
+          message: String(input.message || '').slice(0, 5000),
+          number: inv.number || '',
+          firmName
+        }),
         attachments: [
           { filename: input.fileName || `${inv.number}.pdf`, content: Buffer.from(input.pdf, 'base64'), contentType: 'application/pdf' }
         ]

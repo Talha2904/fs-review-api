@@ -45,6 +45,7 @@ export class NodemailerMailer implements Mailer {
       cc: m.cc,
       subject: m.subject,
       text: m.text,
+      ...(m.html ? { html: m.html } : {}),
       attachments: m.attachments?.map((a) => ({ filename: a.filename, content: Buffer.from(a.content), contentType: a.contentType }))
     });
     if (info && typeof (info as { message?: unknown }).message !== 'undefined')

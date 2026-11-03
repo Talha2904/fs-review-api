@@ -9,6 +9,8 @@ export interface MailMessage {
   cc?: string;
   subject: string;
   text: string;
+  /** Optional HTML version; `text` is always sent too, for clients that don't show HTML. */
+  html?: string;
   attachments?: MailAttachment[];
 }
 

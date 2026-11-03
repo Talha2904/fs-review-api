@@ -1,6 +1,7 @@
 import { AppError } from '../../domain/errors.js';
 import { actorOf } from '../../domain/identity/User.js';
 import type { ActivityRecorder } from '../activity/ActivityRecorder.js';
+import { passwordResetEmail } from '../mail/emailLayout.js';
 import type { Clock } from '../ports/Clock.js';
 import type { IdGenerator } from '../ports/IdGenerator.js';
 import type { Logger } from '../ports/Logger.js';
@@ -53,20 +54,20 @@ export class RequestPasswordReset {
     const u = await this.users.findByLogin(key);
     if (!u || !u.active || !u.email || this.limiter.tooMany(`user:${u.id}`, 3, nowMs)) return same;
     const secret = this.tokens.secret();
+    const expiresAt = new Date(nowMs + RESET_MINUTES * 60e3).toISOString();
     await this.resets.create({
       id: this.ids.next(),
       tokenHash: this.tokens.fingerprint(secret),
       userId: u.id,
       createdAt: new Date(nowMs).toISOString(),
-      expiresAt: new Date(nowMs + RESET_MINUTES * 60e3).toISOString(),
+      expiresAt,
       usedAt: null
     });
     const link = `${this.appUrl.replace(/\/$/, '')}/?reset=${secret}`;
     try {
       await this.mailer.send({
         to: u.email,
-        subject: 'Reset your FS Review password',
-        text: `Hello ${u.name},\n\nSomeone asked to reset the password for your FS Review account (${u.username}). To choose a new password, open this link within ${RESET_MINUTES} minutes:\n\n${link}\n\nThe link works once. If you didn’t ask for this, you can ignore this email; your password hasn’t changed.\n`
+        ...passwordResetEmail({ name: u.name, username: u.username, link, expiresAt, minutes: RESET_MINUTES })
       });
       await this.activity.record({
         actor: actorOf(u),
