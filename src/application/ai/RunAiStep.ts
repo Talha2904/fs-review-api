@@ -152,7 +152,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.narrative(input.threshold, input.highMultiple, input.customChecks) }
           ],
           tool: TOOLS.points,
-          maxTokens: 8000
+          maxTokens: 16000
         };
       case 'explain':
         return {
@@ -163,7 +163,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.variance(input.threshold, input.growth) }
           ],
           tool: TOOLS.variance,
-          maxTokens: 8000
+          maxTokens: 16000
         };
       case 'version':
         return {
@@ -176,7 +176,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.versionPass() }
           ],
           tool: TOOLS.versionPass,
-          maxTokens: 8000
+          maxTokens: 16000
         };
     }
   }

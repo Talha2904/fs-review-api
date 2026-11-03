@@ -18,11 +18,12 @@ export class AnthropicGateway implements AiGateway {
   async structured<T = unknown>(call: StructuredCall): Promise<StructuredResult<T>> {
     const client = this.require();
     try {
+      // Current models reject `temperature` and a forced tool_choice ('tool' / 'any'), so the tool is offered
+      // with 'auto' and the system prompt asks for exactly one call to it. This works on every Claude model.
       const res = await client.messages.create({
         model: call.model,
         max_tokens: call.maxTokens,
-        temperature: 0,
-        system: call.system,
+        system: `${call.system}\n\nAnswer only by calling the ${call.tool.name} tool, exactly once.`,
         tools: [
           {
             name: call.tool.name,
@@ -30,11 +31,18 @@ export class AnthropicGateway implements AiGateway {
             input_schema: call.tool.input_schema as Anthropic.Tool['input_schema']
           }
         ],
-        tool_choice: { type: 'tool', name: call.tool.name },
+        tool_choice: { type: 'auto', disable_parallel_tool_use: true },
         messages: [{ role: 'user', content: call.content as Anthropic.ContentBlockParam[] }]
       });
-      const out = res.content.find((b) => b.type === 'tool_use');
-      if (!out || out.type !== 'tool_use') throw new AiGatewayError('Claude returned no structured output');
+      const out = res.content.find((b) => b.type === 'tool_use' && b.name === call.tool.name);
+      if (!out || out.type !== 'tool_use')
+        throw new AiGatewayError(
+          res.stop_reason === 'max_tokens'
+            ? 'Claude ran out of room before answering. Try again, or analyse fewer or smaller documents.'
+            : res.stop_reason === 'refusal'
+              ? 'Claude declined this request.'
+              : 'Claude returned no structured output'
+        );
       return {
         output: out.input as T,
         model: res.model,
