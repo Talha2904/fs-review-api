@@ -6,7 +6,7 @@ import type { Doc, DocSlot, Docs, Point, Reading, VarianceRow, VarNote } from '@
 import type { AiStepInput } from '../ai/RunAiStep.js';
 import type { DocumentReader } from '../ports/DocumentReader.js';
 
-import type { AnalysisAi, AnalysisFile } from './AnalysisPipeline.js';
+import type { AnalysisAi, AnalysisFile, ReviewOutcome, Workbooks } from './AnalysisPipeline.js';
 
 /** Runs one AI step as the user who started the analysis. */
 export type RunStep = (input: AiStepInput) => Promise<unknown>;
@@ -31,21 +31,35 @@ export class AiAnalysisSteps implements AnalysisAi {
     return (await this.runStep({ step: 'extract', slot, file: payload })) as Reading;
   }
 
-  /** 2. Qualitative narrative and disclosure review. */
+  /** 2. Accounting, narrative and disclosure review, with a director-level summary. */
   async narrative(
     docs: Docs,
     threshold: number,
     highMultiple = 4,
-    customChecks: { id: string; name: string; instruction: string }[] = []
-  ): Promise<Point[]> {
+    customChecks: { id: string; name: string; instruction: string }[] = [],
+    workbooks: Workbooks = {}
+  ): Promise<ReviewOutcome> {
     const out = (await this.runStep({
       step: 'narrative',
       threshold,
       highMultiple,
       customChecks,
-      docs: { cy: lean(docs.cy), py: lean(docs.py), is: lean(docs.is), sup: lean(docs.sup) }
-    })) as { points?: Point[] };
-    return (out.points || []).map((p) => ({ ...p, source: 'narrative' }));
+      docs: {
+        cy: lean(docs.cy),
+        py: lean(docs.py),
+        is: lean(docs.is),
+        sup: lean(docs.sup),
+        ag: lean(docs.ag),
+        tbText: workbooks.tb,
+        isText: workbooks.is
+      }
+    })) as { points?: Point[]; summary?: string; readyForApproval?: boolean; blockers?: string[] };
+    return {
+      points: (out.points || []).map((p) => ({ ...p, source: 'narrative' })),
+      summary: out.summary || '',
+      readyForApproval: out.readyForApproval === true,
+      blockers: Array.isArray(out.blockers) ? out.blockers : []
+    };
   }
 
   /** 3. Commentary for the variance lines the model put outside expectation, keyed by line label. */
@@ -63,7 +77,7 @@ export class AiAnalysisSteps implements AnalysisAi {
         pct: pct && +pct.toFixed(1),
         band
       })),
-      docs: { py: lean(docs.py), sup: lean(docs.sup) }
+      docs: { py: lean(docs.py), sup: lean(docs.sup), ag: lean(docs.ag) }
     })) as { lines?: (VarNote & { label: string })[] };
     return Object.fromEntries((out.lines || []).map((l) => [l.label, l]));
   }

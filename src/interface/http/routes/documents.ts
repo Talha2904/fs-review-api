@@ -60,7 +60,7 @@ export function documentRoutes(uc: UseCases): Router {
       try {
         const f = req.file;
         if (!f) throw validationFailed('No file was received.');
-        const body = req.body as { slot?: string; responseTo?: string };
+        const body = req.body as { slot?: string; responseTo?: string; nextDraft?: string };
         const slot = String(body.slot ?? '');
         const responseTo = body.responseTo ? String(body.responseTo).slice(0, 64) : undefined;
         res.json(
@@ -71,7 +71,7 @@ export function documentRoutes(uc: UseCases): Router {
             slot,
             f.originalname,
             new Uint8Array(f.buffer),
-            responseTo ? { responseTo } : {}
+            responseTo ? { responseTo } : body.nextDraft === '1' ? { nextDraft: true } : {}
           )
         );
       } catch (e) {

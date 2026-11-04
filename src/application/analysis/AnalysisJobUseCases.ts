@@ -316,7 +316,9 @@ export class RunAnalysisJob {
                     fundName,
                     aiAllowed: ctx.aiAllowed,
                     currency: ctx.currency,
-                    umbrella: ctx.umbrella ? ctx.umbrellaName : null
+                    umbrella: ctx.umbrella ? ctx.umbrellaName : null,
+                    entityType: String(ctx.entity?.entityType ?? ''),
+                    framework: String(ctx.entity?.framework ?? '')
                   }),
                 this.d.reader
               ),
@@ -425,7 +427,7 @@ export class RunAnalysisJob {
   /** AI readings kept by content: an umbrella document is read separately for each sub-fund. */
   private readingCache(ctx: AnalysisContext, actor: Actor | null) {
     const key = (slot: DocSlot, sha: string) =>
-      `${ctx.umbrella && slot !== 'sup' ? `${slot}@${ctx.umbrellaName}` : slot}:${sha}:${ctx.model || 'default'}`;
+      `${ctx.umbrella && slot !== 'sup' && slot !== 'ag' ? `${slot}@${ctx.umbrellaName}` : slot}:${sha}:${ctx.model || 'default'}`;
     return {
       get: async (slot: DocSlot, sha: string) => ((await this.d.readings.get(key(slot, sha)))?.reading as Reading | undefined) ?? null,
       put: async (slot: DocSlot, sha: string, reading: Reading) =>

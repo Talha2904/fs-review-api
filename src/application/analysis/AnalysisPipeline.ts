@@ -33,7 +33,7 @@ import {
 
 import type { DocumentReader } from '../ports/DocumentReader.js';
 
-export const SLOTS: readonly DocSlot[] = ['cy', 'py', 'tb', 'is', 'sup'];
+export const SLOTS: readonly DocSlot[] = ['cy', 'py', 'tb', 'is', 'sup', 'ag'];
 /** The figures each slot supplies when it is a built-in sample. */
 const SLOT_KEYS: Record<DocSlot, string[]> = {
   cy: [
@@ -58,7 +58,8 @@ const SLOT_KEYS: Record<DocSlot, string[]> = {
   py: [],
   tb: ['tbDr', 'tbCr'],
   is: ['sched'],
-  sup: ['mgmtRate']
+  sup: ['mgmtRate'],
+  ag: []
 };
 const SAMPLE_K: Figures = { ...S.K, pyOpenNA: 379904870 };
 /** The progress steps the screens show; `tick(n)` reports that step n of these has finished. */
@@ -83,7 +84,7 @@ const keepDemo = (p: Point, setup: Setup): boolean =>
 
 const docShell = (slot: DocSlot, ex: Reading, fileName: string): Doc => ({
   ...S.docs[slot],
-  title: ex.title || S.docs[slot].title,
+  title: ex.title || S.docs[slot]?.title || 'Agreements and Correspondence',
   meta: ex.meta || '',
   blocks: ex.blocks || [],
   sub: fileName,
@@ -125,6 +126,20 @@ export interface AnalysisFile {
   bytes(): Promise<Uint8Array>;
 }
 
+/** The trial balance and supporting schedules as CSV text, every sheet, for the review. */
+export interface Workbooks {
+  tb?: string | undefined;
+  is?: string | undefined;
+}
+
+/** What the review step returns: its points and the director-level conclusion. */
+export interface ReviewOutcome {
+  points: Point[];
+  summary: string;
+  readyForApproval: boolean;
+  blockers: string[];
+}
+
 /** The four Claude steps, in the shapes the pipeline uses. */
 export interface AnalysisAi {
   extract(slot: DocSlot, file: AnalysisFile): Promise<Reading>;
@@ -132,8 +147,9 @@ export interface AnalysisAi {
     docs: Docs,
     threshold: number,
     highMultiple: number | undefined,
-    customChecks: { id: string; name: string; instruction: string }[]
-  ): Promise<Point[]>;
+    customChecks: { id: string; name: string; instruction: string }[],
+    workbooks?: Workbooks
+  ): Promise<ReviewOutcome>;
   explain(lines: VarianceRow[], docs: Docs, threshold: number, growth: number): Promise<Record<string, VarNote>>;
   versionPass(input: {
     priorPoints: Point[];
@@ -195,7 +211,7 @@ export async function liveAnalysis(input: LiveAnalysisInput, deps: LiveAnalysisD
   const extracted = await Promise.all(
     SLOTS.filter((s) => files[s]).map(async (slot): Promise<[DocSlot, Doc, Figures]> => {
       const f = files[slot] as AnalysisFile;
-      if (f.sample) return [slot, { ...S.docs[slot] }, Object.fromEntries(SLOT_KEYS[slot].map((k) => [k, SAMPLE_K[k]]))];
+      if (f.sample) return [slot, { ...(S.docs[slot] as Doc) }, Object.fromEntries(SLOT_KEYS[slot].map((k) => [k, SAMPLE_K[k]]))];
       // An Excel trial balance or investment schedule is read by the app itself, without AI, when its
       // layout is recognised; otherwise it is read by AI.
       if ((slot === 'tb' || slot === 'is') && /\.xlsx$/i.test(f.name || '')) {
@@ -208,14 +224,14 @@ export async function liveAnalysis(input: LiveAnalysisInput, deps: LiveAnalysisD
       }
       // A digitally produced PDF of the statements or supporting information is read by the app when it
       // finds every figure; a partial reading is used only when AI is not available to read it fully.
-      if (['cy', 'py', 'sup'].includes(slot) && /\.pdf$/i.test(f.name || '') && f.readWith !== 'ai') {
+      if (['cy', 'py', 'sup', 'ag'].includes(slot) && /\.pdf$/i.test(f.name || '') && f.readWith !== 'ai') {
         let content = await deps.reader.pdfContent(await f.bytes());
         // scanned: read it with OCR on this server (no AI)
         if (isScanned(content) && deps.ocr) {
           const before = content;
           content = await deps.ocr(f).catch(() => before);
         }
-        const local = parseFinancialPdf(content, slot, slot === 'sup' ? null : umbrella);
+        const local = parseFinancialPdf(content, slot, slot === 'sup' || slot === 'ag' ? null : umbrella);
         if (local && (!local.local?.missing?.length || ai.extract === false)) {
           aiReads.local.push(slot);
           return [slot, docShell(slot, local, f.name), local.figures || {}];
@@ -250,10 +266,17 @@ export async function liveAnalysis(input: LiveAnalysisInput, deps: LiveAnalysisD
     .filter((r) => r.engine === 'custom-narrative' && ruleOn(setup, r.id))
     .map((r) => ({ id: r.id, name: r.name, instruction: r.def?.instruction || '' }));
   if (setup.narrative && ai.narrative === false) aiSkipped.push('Narrative review');
-  const narrative =
-    setup.narrative && ai.narrative !== false
-      ? (await deps.ai.narrative(docs, th, setup.highMultiple, customNarrative)).map((p) => ({ ...p, aiDrafted: true }))
-      : [];
+  let review: AnalysisResult['review'];
+  let narrative: Point[] = [];
+  if (setup.narrative && ai.narrative !== false) {
+    // the whole trial balance and schedule workbooks: minutes and agreements are tested against every sheet
+    const asText = async (f: AnalysisFile | undefined) =>
+      f && !f.sample && /\.xlsx$/i.test(f.name || '') ? deps.reader.xlsxText(await f.bytes()) : undefined;
+    const [tbText, isText] = await Promise.all([asText(files.tb), asText(files.is)]);
+    const out = await deps.ai.narrative(docs, th, setup.highMultiple, customNarrative, { tb: tbText, is: isText });
+    narrative = out.points.map((p) => ({ ...p, aiDrafted: true }));
+    if (out.summary) review = { summary: out.summary, readyForApproval: out.readyForApproval, blockers: out.blockers };
+  }
   next();
 
   // 3. Variance commentary on lines outside expectation
@@ -262,7 +285,14 @@ export async function liveAnalysis(input: LiveAnalysisInput, deps: LiveAnalysisD
     ? varianceModel(docs.cy, {}, th, growth, { ...varianceOpts(setup), currency }).rows.filter((r) => r.band !== 'Expected' && !r.sub)
     : [];
   if (flagged.length && ai.explain === false) aiSkipped.push('Variance explanations');
-  const rawNotes = flagged.length && ai.explain !== false ? await deps.ai.explain(flagged, docs, th, growth) : {};
+  // commentary only: if it fails, the lines keep the model's own wording and the result says so
+  const rawNotes =
+    flagged.length && ai.explain !== false
+      ? await deps.ai.explain(flagged, docs, th, growth).catch(() => {
+          aiSkipped.push('Variance explanations (the AI answer was incomplete)');
+          return {} as Record<string, VarNote>;
+        })
+      : {};
   const varNotes: Record<string, VarNote> = Object.fromEntries(Object.entries(rawNotes).map(([k, v]) => [k, { ...v, aiDrafted: true }]));
   next();
 
@@ -334,5 +364,16 @@ export async function liveAnalysis(input: LiveAnalysisInput, deps: LiveAnalysisD
 
   const draft = annotateFlags(docs.cy, points);
   if (draft) docs.cy = draft;
-  return { docs, K, points, varNotes, version: previous ? previous.version + 1 : 1, priorResolved, demo: false, aiSkipped, aiReads };
+  return {
+    docs,
+    K,
+    points,
+    varNotes,
+    version: previous ? previous.version + 1 : 1,
+    priorResolved,
+    demo: false,
+    aiSkipped,
+    aiReads,
+    ...(review ? { review } : {})
+  };
 }

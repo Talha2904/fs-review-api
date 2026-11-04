@@ -44,12 +44,17 @@ export function layoutBlocks(lines: PdfLine[], names: string[] = []): Block[] {
       cells = ln.cells;
     let k = cells.length;
     while (k > 0 && isNum((cells[k - 1] as PdfLine['cells'][number]).str)) k--;
-    const nums = cells.slice(k),
-      labelCells = cells.slice(0, k),
-      label = labelCells
+    let nums = cells.slice(k),
+      label = cells
+        .slice(0, k)
         .map((c) => c.str)
         .join(' ')
         .trim();
+    // a grid row labelled by its year ("2024 | 66,756,000 | …" under Opening … Closing): the year is its label
+    if (!label && cols && !cols.some(isYear) && nums.length === cols.length + 1 && isYear((nums[0] as PdfLine['cells'][number]).str)) {
+      label = (nums[0] as PdfLine['cells'][number]).str;
+      nums = nums.slice(1);
+    }
     const last = blocks[blocks.length - 1];
     if (!nums.length) {
       if (HEADING.test(label) && label.length < 90) {
@@ -63,18 +68,19 @@ export function layoutBlocks(lines: PdfLine[], names: string[] = []): Block[] {
         last.sub = last.sub ? `${last.sub} · ${label}` : label;
         continue;
       }
-      // a header row of short column titles to the right (e.g. Level 1 | Level 2 | Level 3 | Total)
-      const right = cells.filter((c) => c.x > ln.pageWidth * 0.4);
-      if (right.length >= 2 && right.every((c) => (c.str.length <= 14 || isName(c.str)) && !isNum(c.str))) {
+      // a header row of short column titles to the right (e.g. Level 1 | Level 2 | Level 3 | Total); a row of
+      // four or more short titles is a grid header whole (Year | Opening | Contributions | … | Closing)
+      const short = (c: PdfLine['cells'][number]) => (c.str.length <= 14 || isName(c.str)) && !isNum(c.str);
+      // (only when titles start in the left part, which the right-hand rule would otherwise drop)
+      const grid = cells.length >= 4 && cells.every(short) && (cells[1] as PdfLine['cells'][number]).x <= ln.pageWidth * 0.4;
+      const right = grid ? cells.slice(1) : cells.filter((c) => c.x > ln.pageWidth * 0.4);
+      if (right.length >= 2 && right.every(short)) {
         cols = right.map((c) => c.str);
         colX = right.map((c) => c.x2);
         table = {
           k: 'table',
           cols,
-          label: cells
-            .filter((c) => c.x <= ln.pageWidth * 0.4)
-            .map((c) => c.str)
-            .join(' '),
+          label: (grid ? cells.slice(0, 1) : cells.filter((c) => c.x <= ln.pageWidth * 0.4)).map((c) => c.str).join(' '),
           rows: []
         };
         blocks.push(table);
@@ -126,10 +132,12 @@ export function layoutBlocks(lines: PdfLine[], names: string[] = []): Block[] {
       table = { k: 'table', cols, label: '', rows: [] };
       blocks.push(table);
     }
-    // place each number in the column whose header ends nearest to it
+    // a full row fills the columns in order; a short one goes by the column whose header ends nearest
+    // (headers may be left-aligned over right-aligned figures, so nearest alone can pick the wrong one)
     const v: (number | null)[] = (cols as string[]).map(() => null);
     const xs = colX as number[];
-    nums.forEach((c) => {
+    if (nums.length === v.length) nums.forEach((c, j) => (v[j] = parseAmount(c.str)));
+    else nums.forEach((c) => {
       let best = 0,
         d = Infinity;
       xs.forEach((x, j) => {
@@ -238,7 +246,7 @@ export function statementFigures(blocks: Block[]): Figures {
     );
   const val = (x: number | null | undefined) => x as number;
   // Statement of financial position: asset lines, liability lines, totals
-  const sfp = rowsOf(find(/financial position|balance sheet/i, /changes/i));
+  const sfp = rowsOf(find(/financial position|balance sheet|assets and liabilities|statement of net assets/i, /changes/i));
   if (sfp.length) {
     let phase = 'assets';
     const ca: number[] = [],
@@ -259,7 +267,8 @@ export function statementFigures(blocks: Block[]): Figures {
         phase = 'after';
         continue;
       }
-      if (/^net assets attributable|^net assets$/i.test(r.l)) {
+      // funds: net assets attributable; companies and partnerships: equity, partners' or members' capital
+      if (/^net assets attributable|^net assets(\s*\/\s*equity)?$|^total (equity|partners'? capital|members'? (equity|interests))$/i.test(r.l)) {
         F.statedNA = r.cy;
         phase = 'after';
         continue;
@@ -283,20 +292,20 @@ export function statementFigures(blocks: Block[]): Figures {
     }
     const ex = sci.find((r) => /operating expenses|^total expenses|^expenses/i.test(r.l));
     if (ex) F.sciExp = Math.abs(val(ex.cy));
-    const op = sci.find((r) => /(increase|decrease) in net assets.*operations|profit for the year/i.test(r.l));
+    const op = sci.find((r) => /(increase|decrease) in net assets.*operations|^(net )?(profit|loss|income) for the (year|period)/i.test(r.l));
     if (op) F.ops = op.cy;
   }
   // Statement of changes in net assets
-  const socna = rowsOf(find(/changes in net assets|changes in equity/i));
+  const socna = rowsOf(find(/changes in (net assets|equity|partners'? capital|members'? (equity|capital)|shareholders'? equity)/i));
   if (socna.length) {
     const open = socna.find((r) => /beginning|brought forward|opening|^at 1 /i.test(r.l));
     if (open) {
       F.pyNA = open.cy;
       if (open.py != null) F.pyOpenNA = open.py;
     }
-    const sub = socna.find((r) => /subscription|issue of (redeemable )?(participating )?shares/i.test(r.l));
+    const sub = socna.find((r) => /subscription|issue of (redeemable )?(participating )?shares|capital contributions?|^contributions?$/i.test(r.l));
     if (sub) F.subs = Math.abs(val(sub.cy));
-    const red = socna.find((r) => /redemption/i.test(r.l));
+    const red = socna.find((r) => /redemption|withdrawals? of capital/i.test(r.l));
     if (red) F.reds = Math.abs(val(red.cy));
     const dist = socna.find((r) => /distribution|dividends? (paid|to shareholders|declared)/i.test(r.l));
     F.dists = dist ? Math.abs(dist.cy || 0) : 0;
@@ -331,8 +340,10 @@ export function statementFigures(blocks: Block[]): Figures {
 }
 
 // ---- per document type ----------------------------------------------------------------------
-const REQUIRED_CY = ['statedTA', 'statedNA', 'statedIncome'];
+// a total income line is a fund's; a company shows revenue and a partnership its income lines without one
+const REQUIRED_CY = ['statedTA', 'statedNA'];
 const OPTIONAL_CY = [
+  'statedIncome',
   'ca',
   'cl',
   'pyNA',
@@ -366,7 +377,7 @@ export function parseFinancialPdf(content: PdfContent | null | undefined, slot: 
   }
   const tables = blocks.filter((b) => b.k === 'table'),
     heads = blocks.filter((b) => b.k === 'head');
-  if (slot === 'sup') {
+  if (slot === 'sup' || slot === 'ag') {
     const text = content?.text || '';
     const m = text.match(/management fee\.?[^%]{0,200}?(\d+(?:\.\d+)?)\s*%/i);
     const figures: Figures = m ? { mgmtRate: Number(m[1]) / 100 } : {};

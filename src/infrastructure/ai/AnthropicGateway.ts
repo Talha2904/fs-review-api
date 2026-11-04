@@ -34,12 +34,13 @@ export class AnthropicGateway implements AiGateway {
         tool_choice: { type: 'auto', disable_parallel_tool_use: true },
         messages: [{ role: 'user', content: call.content as Anthropic.ContentBlockParam[] }]
       });
+      // an answer cut off at the token limit may hold a partial tool call: never use it as if complete
+      if (res.stop_reason === 'max_tokens')
+        throw new AiGatewayError('Claude ran out of room before answering. Try again, or analyse fewer or smaller documents.');
       const out = res.content.find((b) => b.type === 'tool_use' && b.name === call.tool.name);
       if (!out || out.type !== 'tool_use')
         throw new AiGatewayError(
-          res.stop_reason === 'max_tokens'
-            ? 'Claude ran out of room before answering. Try again, or analyse fewer or smaller documents.'
-            : res.stop_reason === 'refusal'
+          res.stop_reason === 'refusal'
               ? 'Claude declined this request.'
               : 'Claude returned no structured output'
         );

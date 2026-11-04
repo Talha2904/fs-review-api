@@ -19,7 +19,7 @@ import type { AiGateway, ContentBlock } from '../ports/AiGateway.js';
 
 import type { LoadAiSettings } from './AiSettingsUseCases.js';
 import { plainAiError } from './aiErrors.js';
-import { PROMPTS, SYSTEM, TOOLS } from './prompts.js';
+import { describeEntity, describeFramework, PROMPTS, SYSTEM, TOOLS } from './prompts.js';
 
 export interface UploadedFile {
   fileName: string;
@@ -36,6 +36,9 @@ export interface AiRequestContext {
   aiAllowed: boolean;
   currency: string;
   umbrella?: string | null;
+  /** the entity's type and accounting framework, which the review applies */
+  entityType?: string | null;
+  framework?: string | null;
 }
 
 export type AiStepInput =
@@ -54,6 +57,10 @@ const json = (name: string, obj: unknown): ContentBlock => ({
   type: 'text',
   text: `<${name}>\n${JSON.stringify(obj ?? null)}\n</${name}>`
 });
+/** A workbook as CSV text, when there is one; capped so one large file cannot crowd out the rest. */
+const WORKBOOK_CHARS = 150_000;
+const workbook = (name: string, text: unknown): ContentBlock[] =>
+  typeof text === 'string' && text.trim() ? [{ type: 'text', text: `<${name}>\n${text.slice(0, WORKBOOK_CHARS)}\n</${name}>` }] : [];
 
 /** Re-checks an upload against its slot's rule before anything is sent to Claude. */
 export function checkUpload(slot: unknown, file: unknown): { slot: Slot; file: UploadedFile } {
@@ -106,7 +113,9 @@ export class RunAiStep {
     try {
       const r = await this.gateway.structured({
         model: ai.model,
-        system: SYSTEM.replaceAll('{CURRENCY}', currency),
+        system: SYSTEM.replaceAll('{CURRENCY}', currency)
+          .replaceAll('{ENTITY}', describeEntity(ctx.entityType))
+          .replaceAll('{FRAMEWORK}', describeFramework(ctx.framework)),
         content: content.map((b) => (b.type === 'text' ? { ...b, text: b.text.replaceAll('{CURRENCY}', currency) } : b)),
         tool,
         maxTokens
@@ -149,10 +158,15 @@ export class RunAiStep {
             json('prior_year_signed', input.docs.py),
             json('investment_schedule', input.docs.is),
             json('supporting_information', input.docs.sup ?? null),
+            json('agreements_and_correspondence', input.docs.ag ?? null),
+            // whole workbooks, every sheet: the readings above keep only the accounts and the holdings
+            ...workbook('trial_balance_workbook', input.docs.tbText),
+            ...workbook('supporting_schedules_workbook', input.docs.isText),
             { type: 'text' as const, text: PROMPTS.narrative(input.threshold, input.highMultiple, input.customChecks) }
           ],
           tool: TOOLS.points,
-          maxTokens: 16000
+          // below the SDK's limit for a request that is not streamed (about 21,000)
+          maxTokens: 20000
         };
       case 'explain':
         return {
@@ -163,7 +177,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.variance(input.threshold, input.growth) }
           ],
           tool: TOOLS.variance,
-          maxTokens: 16000
+          maxTokens: 20000
         };
       case 'version':
         return {

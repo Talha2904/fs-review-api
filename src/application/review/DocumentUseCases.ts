@@ -54,12 +54,16 @@ export class AttachDocument {
     slot: unknown,
     fileName: string,
     bytes: Uint8Array,
-    opts: { responseTo?: string } = {}
+    opts: { responseTo?: string; nextDraft?: boolean } = {}
   ): Promise<AttachResult> {
-    // A revised document on a response to an open point is the one upload allowed while the documents are marked ready.
+    // Two uploads are allowed while the documents are marked ready: a revised document on a response to an
+    // open point, and the next draft of the statements for the version pass (which needs them ready).
+    if (opts.nextDraft && slot !== 'cy') throw validationFailed('Only a new draft of the financial statements can be attached as the next draft.');
     const by = opts.responseTo
       ? await this.access.documentWriter(actor, matrix, engagementId, ['points.respond'], { whileReady: true })
-      : await this.access.documentWriter(actor, matrix, engagementId, ['documents.attach']);
+      : opts.nextDraft
+        ? await this.access.documentWriter(actor, matrix, engagementId, ['analysis.run'], { whileReady: true })
+        : await this.access.documentWriter(actor, matrix, engagementId, ['documents.attach']);
     if (opts.responseTo) {
       const point = await this.points.findById(opts.responseTo);
       if (!point || point.engagementId !== engagementId) throw validationFailed('That review point was not found on this fund.');

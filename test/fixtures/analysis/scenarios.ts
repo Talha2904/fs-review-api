@@ -246,7 +246,7 @@ const titleOf = (p: unknown) => String((p as { title?: string })?.title || '');
 
 export function cannedAi(step: 'extract' | 'narrative' | 'explain' | 'version', body: Body): unknown {
   if (step === 'extract') {
-    const slot = body.slot as DocSlot;
+    const slot = body.slot as Exclude<DocSlot, 'ag'>; // the sample fund has no agreements document
     const doc = S.docs[slot];
     const keys: Record<string, string[]> = {
       cy: [

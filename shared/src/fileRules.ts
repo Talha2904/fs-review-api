@@ -4,7 +4,7 @@
 export const MAX_MB = 25;
 export const MAX_BYTES = MAX_MB * 1048576;
 
-export const SLOTS = ['cy', 'py', 'tb', 'is', 'sup'] as const;
+export const SLOTS = ['cy', 'py', 'tb', 'is', 'sup', 'ag'] as const;
 export type Slot = (typeof SLOTS)[number];
 export type FileKind = 'pdf' | 'xlsx';
 
@@ -13,7 +13,8 @@ export const SLOT_RULES: Record<Slot, { type: FileKind; label: string }> = {
   py: { type: 'pdf', label: 'PDF' },
   tb: { type: 'xlsx', label: 'Excel (.xlsx)' },
   is: { type: 'xlsx', label: 'Excel (.xlsx)' },
-  sup: { type: 'pdf', label: 'PDF' }
+  sup: { type: 'pdf', label: 'PDF' },
+  ag: { type: 'pdf', label: 'PDF' }
 };
 
 export const ACCEPT: Record<FileKind, string> = {

@@ -76,7 +76,8 @@ export const steps = [
   'Ranking review points'
 ];
 
-export const docs: Record<DocSlot, Doc> = {
+// no sample for the agreements slot: it is optional and the sample fund has none
+export const docs: Record<Exclude<DocSlot, 'ag'>, Doc> & Partial<Record<DocSlot, Doc>> = {
   cy: {
     name: 'Draft Financial Statements',
     tag: 'Draft',

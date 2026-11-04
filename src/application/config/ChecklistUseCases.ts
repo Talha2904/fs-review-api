@@ -7,7 +7,7 @@ import type { ChecklistItem, ChecklistTemplate, ChecklistTemplateRepository } fr
 import type { Clock } from '../ports/Clock.js';
 import type { IdGenerator } from '../ports/IdGenerator.js';
 
-export const FRAMEWORKS = ['FRS 102', 'IFRS', 'Other'] as const;
+export const FRAMEWORKS = ['FRS 102', 'IFRS', 'US GAAP', 'Other'] as const;
 
 /** Cleans imported or edited items the same way the Administration screen does. */
 export function cleanChecklistItems(raw: unknown): ChecklistItem[] {

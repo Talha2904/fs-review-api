@@ -40,9 +40,14 @@ function findLayout(rows: unknown[][]): Layout | null {
   for (let i = 0; i < Math.min(rows.length, 40); i++) {
     const r = (rows[i] as unknown[]).map(txt),
       low = r.map((c) => c.toLowerCase());
-    const dr = low.findIndex((c) => /^debits?\b|^dr\b/.test(c)),
-      cr = low.findIndex((c) => /^credits?\b|^cr\b/.test(c));
-    const balCol = low.findIndex((c) => /^(closing )?balance\b|^net\b|^amount\b/.test(c));
+    // "2025 debit" beside "2024 debit": the column of the latest year; a column with no year counts as current
+    const yearOf = (c: string) => +(/^(?:fy\s?)?(\d{4})\s/.exec(c)?.[1] || 9999);
+    const bare = low.map((c) => c.replace(/^(?:fy\s?)?\d{4}\s+/, ''));
+    const latest = (re: RegExp) =>
+      bare.reduce((best, c, j) => (re.test(c) && (best < 0 || yearOf(low[j]!) > yearOf(low[best]!)) ? j : best), -1);
+    const dr = latest(/^debits?\b|^dr\b/),
+      cr = latest(/^credits?\b|^cr\b/);
+    const balCol = latest(/^(closing )?balance\b|^net\b(?! movement)|^amount\b/);
     if ((dr < 0 || cr < 0) && balCol < 0) continue;
     // an explicit name or description column wins; a plain "Account" column is then the code
     let nameCol = low.findIndex((c) => /name|description|details/.test(c));

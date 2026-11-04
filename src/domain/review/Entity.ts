@@ -18,6 +18,8 @@ export interface EntityDocument extends EntityAiDecision {
   administrator: string;
   auditor: string;
   framework: string;
+  /** what the entity is (ENTITY_TYPES); empty is read as an open-ended fund, as before types existed */
+  entityType: string;
   ruleOverrides: Record<string, unknown>;
   partnerSignoff: boolean;
   umbrella: boolean;
@@ -40,6 +42,7 @@ export const ENTITY_DEFAULTS: Omit<EntityDocument, 'id'> = {
   aiDecidedBy: null,
   aiDecidedAt: null,
   framework: '',
+  entityType: '',
   ruleOverrides: {},
   partnerSignoff: false,
   umbrella: false,

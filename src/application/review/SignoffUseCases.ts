@@ -168,7 +168,8 @@ const SLOT_NAMES: Partial<Record<string, string>> = {
   py: 'Prior Year Signed Financial Statements',
   tb: 'Trial Balance',
   is: 'Investment Schedule',
-  sup: 'Supporting Information'
+  sup: 'Supporting Information',
+  ag: 'Agreements and Correspondence'
 };
 
 function billingEventFor(eng: EngagementDocument, ent: EntityDocument | null, by: Actor, at: string, conclusion: string) {

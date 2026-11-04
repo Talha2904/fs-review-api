@@ -29,9 +29,10 @@ interface Table {
 function findTable(rows: unknown[][]): Layout | null {
   for (let i = 0; i < Math.min(rows.length, 40); i++) {
     const low = (rows[i] as unknown[]).map((c) => txt(c).toLowerCase());
-    const valCol = low.findIndex(
-      (c) => /market value|fair value|valuation|^value\b|^mv\b|book value|base value/.test(c) && !/%|percent|price/.test(c)
-    );
+    // the year-end value: a "Closing fair value" beside a "Prior fair value" in a rollforward is the one
+    const isValue = (c: string) => /market value|fair value|valuation|^value\b|^mv\b|book value|base value/.test(c) && !/%|percent|price|level/.test(c);
+    const closing = low.findIndex((c) => isValue(c) && /closing|year.?end|current|\b20\d\d\b/.test(c) && !/prior|opening/.test(c));
+    const valCol = closing >= 0 ? closing : low.findIndex((c) => isValue(c) && !/prior|opening/.test(c));
     if (valCol < 0) continue;
     const classCol = low.findIndex((c) => /asset class|^class\b|category|sector|asset type|^type\b/.test(c));
     let secCol = low.findIndex((c) => /security|holding|instrument|issuer|description|^name\b|investment/.test(c) && !/value/.test(c));

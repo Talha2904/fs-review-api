@@ -25,6 +25,9 @@
     "import:legacy": "tsx scripts/import-legacy.ts",
     "fixtures:analysis": "tsx scripts/make-analysis-fixtures.ts",
     "parity:analysis": "tsx scripts/analysis-parity.ts",
+    "readers:demo": "tsx scripts/demo-readers.ts",
+    "score:demo": "tsx scripts/score-demo.ts",
+    "checks:demo": "tsx scripts/demo-checks.ts",
     "test:coverage": "npm run test -w shared && vitest run --coverage",
     "check:portability": "node scripts/check-portability.mjs",
     "load-test": "tsx scripts/load-test.ts"

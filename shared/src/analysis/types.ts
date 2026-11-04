@@ -57,7 +57,7 @@ export interface Doc {
   [extra: string]: unknown;
 }
 
-export type DocSlot = 'cy' | 'py' | 'tb' | 'is' | 'sup';
+export type DocSlot = 'cy' | 'py' | 'tb' | 'is' | 'sup' | 'ag';
 export type Docs = Partial<Record<DocSlot, Doc>>;
 
 /** Normalised figures the checks run on (see FIGURES in checkLibrary). Lists are lines to be added up. */
@@ -228,4 +228,6 @@ export interface AnalysisResult {
   demo: boolean;
   aiSkipped?: string[];
   aiReads?: { read: string[]; reused: string[]; local: string[] };
+  /** the AI review's director-level conclusion; absent when the review did not run */
+  review?: { summary: string; readyForApproval: boolean; blockers: string[] };
 }
