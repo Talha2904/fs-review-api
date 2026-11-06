@@ -6,6 +6,16 @@ import type { Actor } from '../../domain/identity/User.js';
 import { requirePermission } from '../identity/authorize.js';
 import type { ActivityLog } from '../ports/ActivityLog.js';
 
+/**
+ * What someone without the whole log (everyone except Administrators) sees of an entry: who did what, when,
+ * and the plain details. The client's IP address and an AI call's model and token counts are technical
+ * records for Administrators, so they are left out here, before they leave the server (screen and export).
+ */
+export function staffView(e: ActivityEntry): ActivityEntry {
+  const { usage: _usage, ...rest } = e;
+  return { ...rest, ip: '', details: e.usage || e.category === 'AI' ? '' : e.details };
+}
+
 /** Administrators read everything; other signed-in users read one fund's entries at a time. */
 export class ListActivity {
   constructor(private readonly log: ActivityLog) {}
@@ -14,7 +24,7 @@ export class ListActivity {
     requirePermission(actor, 'activity.write', matrix);
     const all = can(actor, 'activity.read', matrix);
     if (!all && !engagementId) throw forbidden('Choose a fund to see its activity.');
-    const entries = await this.log.list({ engagementId, limit: Math.min(20000, limit || 5000) });
-    return entries.slice(0, 2000);
+    const entries = (await this.log.list({ engagementId, limit: Math.min(20000, limit || 5000) })).slice(0, 2000);
+    return all ? entries : entries.map(staffView);
   }
 }

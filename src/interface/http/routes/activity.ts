@@ -1,5 +1,7 @@
+import { can } from '@fs-review/shared';
 import { Router } from 'express';
 
+import { staffView } from '../../../application/activity/ListActivity.js';
 import type { UseCases } from '../../../application/UseCases.js';
 import { ipOf, requirePerm } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -21,7 +23,8 @@ export function activityRoutes(uc: UseCases): Router {
         engagementId: b.engagementId ?? null,
         fundName: b.fundName ?? null
       });
-      res.json({ entry });
+      // the recorded IP address is for Administrators only, like the log itself
+      res.json({ entry: can(req.actor, 'activity.read', req.matrix) ? entry : staffView(entry) });
     } catch (e) {
       next(e);
     }

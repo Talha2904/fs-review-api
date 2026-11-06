@@ -32,7 +32,7 @@ const server = app.listen(env.PORT, () => {
       aiKey: env.ANTHROPIC_API_KEY && env.ANTHROPIC_API_KEY.length > 10 ? 'configured' : 'missing',
       mail: c.mailer.configured ? 'on' : 'off'
     },
-    'FS Review api listening'
+    'StatementIQ api listening'
   );
 });
 const stopSchedulers = c.startSchedulers();

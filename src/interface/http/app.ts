@@ -70,7 +70,7 @@ export function createApp(deps: AppDeps): Express {
   if (deps.docsPublic) {
     const openapi = buildOpenApi(deps.version);
     app.get('/api/docs/openapi.json', (_req, res) => res.json(openapi));
-    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'FS Review API' }));
+    app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapi, { customSiteTitle: 'StatementIQ API' }));
   }
 
   app.use('/api', healthRoutes({ ...deps.health, version: deps.version }));

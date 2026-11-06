@@ -727,10 +727,10 @@ export function buildOpenApi(version: string) {
   return new OpenApiGeneratorV31(reg.definitions).generateDocument({
     openapi: '3.1.0',
     info: {
-      title: 'FS Review API',
+      title: 'StatementIQ API',
       version,
       description:
-        'Review workflow, identity, AI proxy, OCR and billing for FS Review. Errors always have the shape { error: { code, message, details? } }.'
+        'Review workflow, identity, AI proxy, OCR and billing for StatementIQ. Errors always have the shape { error: { code, message, details? } }.'
     },
     servers: [{ url: '/' }]
   });

@@ -21,7 +21,7 @@ describe('email layout', () => {
 
   it('sends the reset link as a button and as plain text, with the expiry in UK time', () => {
     const m = reset();
-    expect(m.subject).toBe('Reset your FS Review password');
+    expect(m.subject).toBe('Reset your StatementIQ password');
     expect(m.html).toContain('href="https://fs.example.com/?reset=abc123"');
     expect(m.html).toContain('Hello Talha,');
     expect(m.text).toContain('https://fs.example.com/?reset=abc123');
@@ -40,7 +40,7 @@ describe('email layout', () => {
     });
     expect(m.text).toBe('Dear client,\n\nPlease find the invoice attached.');
     expect(m.html).toContain('>Dear client,</p>');
-    expect(m.html).toContain('Sent by PA Ltd through FS Review.');
+    expect(m.html).toContain('Sent by PA Ltd through StatementIQ.');
     expect(m.html).not.toContain('don’t reply');
   });
 });

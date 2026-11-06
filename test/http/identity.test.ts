@@ -185,6 +185,52 @@ describe('activity log', () => {
     const all = await request(w.app).get('/api/activity').set('Cookie', admin);
     expect(all.body.entries.length).toBeGreaterThan(3);
   });
+
+  it('IP addresses and AI token counts are for Administrators only; everyone else sees who did what', async () => {
+    const w = buildTestWorld();
+    const admin = await setupAdmin(w);
+    await request(w.app)
+      .post('/api/users')
+      .set('Cookie', admin)
+      .send({ name: 'Ali Awan', username: 'ali.awan', password: PW, role: 'Manager' });
+    const am = await login(w, 'ali.awan');
+    const saved = await request(w.app).post('/api/activity').set('Cookie', am.cookie).set('X-Forwarded-For', '203.0.113.7').send({
+      category: 'Review points',
+      summary: 'RP-02: cleared',
+      details: 'Borrowings reclassified',
+      engagementId: 'eng-1',
+      fundName: 'ABC Fund'
+    });
+    expect(saved.body.entry).toMatchObject({ summary: 'RP-02: cleared', ip: '' }); // not echoed back to a non-Administrator
+    await w.log.append({
+      id: 'ai-1',
+      at: w.clock.nowIso(),
+      actor: { id: 'u-am', name: 'Ali Awan', username: 'ali.awan', role: 'Manager' },
+      category: 'AI',
+      summary: 'AI: Narrative review',
+      details: 'claude-sonnet-5-5 · 33944 tokens in, 15381 out',
+      ip: '203.0.113.7',
+      engagementId: 'eng-1',
+      fundName: 'ABC Fund',
+      usage: { step: 'narrative', model: 'claude-sonnet-5-5', input: 33944, output: 15381 }
+    });
+
+    type E = { summary: string; details: string; ip: string; usage?: unknown; actor: { name: string } | null };
+    const staff: E[] = (await request(w.app).get('/api/activity?engagementId=eng-1').set('Cookie', am.cookie)).body.entries;
+    const ai = staff.find((e) => e.summary === 'AI: Narrative review') as E;
+    const rp = staff.find((e) => e.summary === 'RP-02: cleared') as E;
+    expect(ai).toMatchObject({ details: '', ip: '', actor: { name: 'Ali Awan' } });
+    expect(ai.usage).toBeUndefined();
+    expect(rp).toMatchObject({ details: 'Borrowings reclassified', ip: '', actor: { name: 'Ali Awan' } });
+    expect(JSON.stringify(staff)).not.toMatch(/tokens|203\.0\.113\.7/);
+
+    const adm: E[] = (await request(w.app).get('/api/activity?engagementId=eng-1').set('Cookie', admin)).body.entries;
+    expect(adm.find((e) => e.summary === 'AI: Narrative review')).toMatchObject({
+      details: 'claude-sonnet-5-5 · 33944 tokens in, 15381 out',
+      ip: '203.0.113.7',
+      usage: { input: 33944, output: 15381 }
+    });
+  });
 });
 
 describe('password reset by email (UAT L)', () => {

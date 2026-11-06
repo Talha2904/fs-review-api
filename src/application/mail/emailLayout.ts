@@ -21,7 +21,9 @@ export interface EmailLayoutInput {
   footer?: string;
 }
 
-const NO_REPLY = 'Sent automatically by FS Review. Please don’t reply to this email; replies aren’t read.';
+// The product name in every email.
+const PRODUCT = 'StatementIQ';
+const NO_REPLY = `Sent automatically by ${PRODUCT}. Please don’t reply to this email; replies aren’t read.`;
 const INK = '#1C1C1C';
 const MUTED = '#5B5B5B';
 const FONT = "font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
@@ -46,7 +48,7 @@ export function emailLayout(m: EmailLayoutInput): string {
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(m.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F6FA;"><tr><td align="center" style="padding:32px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-    <tr><td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">FS Review<span style="font-weight:400;color:${MUTED};"> · Financial Statement Review</span></td></tr>
+    <tr><td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">${PRODUCT}<span style="font-weight:400;color:${MUTED};"> · By Project Accountants</span></td></tr>
     <tr><td style="background:#ffffff;border-radius:16px;padding:32px 28px;border:1px solid #E4E7EC;">
       <h1 style="margin:0 0 16px;${FONT}font-size:22px;line-height:30px;font-weight:600;color:${INK};">${escapeHtml(m.heading)}</h1>
       ${m.paragraphs.map((p) => para(p, 15, INK, '0 0 16px')).join('\n      ')}
@@ -83,7 +85,7 @@ export function passwordResetEmail(p: { name: string; username: string; link: st
     heading: 'Reset your password',
     paragraphs: [
       `Hello ${first},`,
-      `Someone asked to reset the password for your FS Review account, ${p.username}. Choose a new password with the button below.`
+      `Someone asked to reset the password for your StatementIQ account, ${p.username}. Choose a new password with the button below.`
     ],
     button: { label: 'Choose a new password', url: p.link },
     notes: [
@@ -91,7 +93,7 @@ export function passwordResetEmail(p: { name: string; username: string; link: st
       'If you didn’t ask for this, ignore this email. Your password hasn’t changed, and nobody can change it without this link.'
     ]
   };
-  return { subject: 'Reset your FS Review password', text: emailText(m), html: emailLayout(m) };
+  return { subject: 'Reset your StatementIQ password', text: emailText(m), html: emailLayout(m) };
 }
 
 /** An invoice email: Finance's own message, in the firm's layout, with the PDF attached by the caller. */
@@ -104,7 +106,7 @@ export function invoiceEmail(p: { subject: string; message: string; number: stri
       .map((x) => x.trim())
       .filter(Boolean),
     notes: ['The invoice is attached to this email as a PDF.'],
-    footer: p.firmName ? `Sent by ${p.firmName} through FS Review.` : 'Sent through FS Review.'
+    footer: p.firmName ? `Sent by ${p.firmName} through StatementIQ.` : 'Sent through StatementIQ.'
   };
   return { subject: p.subject, text: p.message, html: emailLayout(m) };
 }
