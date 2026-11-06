@@ -261,38 +261,58 @@ export async function liveAnalysis(input: LiveAnalysisInput, deps: LiveAnalysisD
   next();
   next();
 
+  // 2 and 3 run at the same time: the variance commentary needs only the documents read above, never the
+  // review's points, so neither waits for the other. Same requests, same results; the analysis just takes as
+  // long as the longer of the two instead of both added together.
+
   // 2. Narrative review
   const customNarrative = library
     .filter((r) => r.engine === 'custom-narrative' && ruleOn(setup, r.id))
     .map((r) => ({ id: r.id, name: r.name, instruction: r.def?.instruction || '' }));
   if (setup.narrative && ai.narrative === false) aiSkipped.push('Narrative review');
-  let review: AnalysisResult['review'];
-  let narrative: Point[] = [];
-  if (setup.narrative && ai.narrative !== false) {
-    // the whole trial balance and schedule workbooks: minutes and agreements are tested against every sheet
-    const asText = async (f: AnalysisFile | undefined) =>
-      f && !f.sample && /\.xlsx$/i.test(f.name || '') ? deps.reader.xlsxText(await f.bytes()) : undefined;
-    const [tbText, isText] = await Promise.all([asText(files.tb), asText(files.is)]);
-    const out = await deps.ai.narrative(docs, th, setup.highMultiple, customNarrative, { tb: tbText, is: isText });
-    narrative = out.points.map((p) => ({ ...p, aiDrafted: true }));
-    if (out.summary) review = { summary: out.summary, readyForApproval: out.readyForApproval, blockers: out.blockers };
-  }
-  next();
 
-  // 3. Variance commentary on lines outside expectation
+  // The lines for step 3 are worked out before either call starts: if that work fails (a malformed reading),
+  // the analysis stops before anything is running, as it always did.
   const growth = K.pyNA && K.statedNA ? K.statedNA / K.pyNA - 1 : 0;
   const flagged = ruleOn(setup, 'CHK-11')
     ? varianceModel(docs.cy, {}, th, growth, { ...varianceOpts(setup), currency }).rows.filter((r) => r.band !== 'Expected' && !r.sub)
     : [];
   if (flagged.length && ai.explain === false) aiSkipped.push('Variance explanations');
+
+  const reviewing = (async (): Promise<{ narrative: Point[]; review: AnalysisResult['review'] }> => {
+    if (!setup.narrative || ai.narrative === false) return { narrative: [], review: undefined };
+    // the whole trial balance and schedule workbooks: minutes and agreements are tested against every sheet
+    const asText = async (f: AnalysisFile | undefined) =>
+      f && !f.sample && /\.xlsx$/i.test(f.name || '') ? deps.reader.xlsxText(await f.bytes()) : undefined;
+    const [tbText, isText] = await Promise.all([asText(files.tb), asText(files.is)]);
+    const out = await deps.ai.narrative(docs, th, setup.highMultiple, customNarrative, { tb: tbText, is: isText });
+    return {
+      narrative: out.points.map((p) => ({ ...p, aiDrafted: true })),
+      review: out.summary ? { summary: out.summary, readyForApproval: out.readyForApproval, blockers: out.blockers } : undefined
+    };
+  })();
+  // awaited below with the commentary; this only makes sure a failure can never go unhandled meanwhile
+  reviewing.catch(() => undefined);
+
+  // 3. Variance commentary on lines outside expectation (the lines were picked out above)
   // commentary only: if it fails, the lines keep the model's own wording and the result says so
-  const rawNotes =
+  let explainFailed = false;
+  const explaining: Promise<Record<string, VarNote>> =
     flagged.length && ai.explain !== false
-      ? await deps.ai.explain(flagged, docs, th, growth).catch(() => {
-          aiSkipped.push('Variance explanations (the AI answer was incomplete)');
+      ? deps.ai.explain(flagged, docs, th, growth).catch(() => {
+          explainFailed = true;
           return {} as Record<string, VarNote>;
         })
-      : {};
+      : Promise.resolve({});
+
+  // Both are waited for, so a failed review never leaves the commentary running after the analysis has stopped.
+  const [reviewed, explained] = await Promise.allSettled([reviewing, explaining]);
+  if (reviewed.status === 'rejected') throw reviewed.reason;
+  const { narrative, review } = reviewed.value;
+  next();
+  // `explaining` never rejects (its failure is caught above), so it is always fulfilled
+  const rawNotes = explained.status === 'fulfilled' ? explained.value : {};
+  if (explainFailed) aiSkipped.push('Variance explanations (the AI answer was incomplete)');
   const varNotes: Record<string, VarNote> = Object.fromEntries(Object.entries(rawNotes).map(([k, v]) => [k, { ...v, aiDrafted: true }]));
   next();
 

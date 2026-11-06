@@ -20,7 +20,9 @@ const json = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
 export async function runServerScenario(
   sc: Scenario,
   previous: AnalysisResult | null,
-  existing: { ref: string; title: string }[] = []
+  existing: { ref: string; title: string }[] = [],
+  /** awaited inside each AI call before its canned answer: lets a test slow a step down or make it fail */
+  during?: (step: string) => Promise<void>
 ): Promise<EngineRun> {
   const { setup, library } = setupFor(sc.engagement, sc.entity, sc.config);
   const ticks: number[] = [],
@@ -41,6 +43,7 @@ export async function runServerScenario(
   }
   const ai = new AiAnalysisSteps(async (input: AiStepInput) => {
     aiCalls.push(input.step);
+    await during?.(input.step);
     return json(cannedAi(input.step, json(input) as unknown as Record<string, unknown>));
   }, reader);
   const result = await liveAnalysis(

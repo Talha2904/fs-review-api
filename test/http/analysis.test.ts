@@ -196,13 +196,15 @@ describe('analysis on the server (UAT D1, D2)', { timeout: 30_000 }, () => {
     const ai = snap.points.find((p: { content: { title: string } }) => p.content.title === 'Director who resigned is still listed');
     expect(ai.content).toMatchObject({ aiDrafted: true, source: 'narrative' });
     const calls = x.w.log.entries.filter((e) => e.category === 'AI' && e.usage);
-    expect(calls.map((e) => e.summary)).toEqual(['AI: Narrative review', 'AI: Variance explanations']);
-    expect(calls[0]).toMatchObject({
-      engagementId: x.eng.id,
-      fundName: 'ABC Fund',
-      actor: { name: 'Rahat Kalim' },
-      usage: { input: 1000, output: 100 }
-    });
+    // the review and the variance commentary run at the same time, so either may be logged first
+    expect(calls.map((e) => e.summary).sort()).toEqual(['AI: Narrative review', 'AI: Variance explanations']);
+    for (const call of calls)
+      expect(call).toMatchObject({
+        engagementId: x.eng.id,
+        fundName: 'ABC Fund',
+        actor: { name: 'Rahat Kalim' },
+        usage: { input: 1000, output: 100 }
+      });
   });
 
   it('a failure is reported on the job and in the log, with a plain reason', async () => {
