@@ -61,7 +61,11 @@ export const ReviewSnapshotSchema = z
     analysisJob: z
       .record(z.string(), z.unknown())
       .nullable()
-      .openapi({ description: 'The latest analysis requested on the api, in the AnalysisJob shape: follow its status and step' })
+      .openapi({ description: 'The latest analysis requested on the api, in the AnalysisJob shape: follow its status and step' }),
+    shared: z
+      .object({ points: z.array(z.record(z.string(), z.unknown())), messages: z.array(z.record(z.string(), z.unknown())) })
+      .optional()
+      .openapi({ description: 'The other funds’ copies of this fund’s shared points, and their threads' })
   })
   .openapi('ReviewSnapshot');
 export const ReviewSnapshotsResponse = z.object({ reviews: z.record(z.string(), ReviewSnapshotSchema) }).openapi('ReviewSnapshotsResponse');

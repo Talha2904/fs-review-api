@@ -29,7 +29,9 @@ export const ConsolidatedGroupsResponse = z
         groupKey: z.string(),
         groupName: z.string(),
         yearEnd: z.string(),
-        funds: z.array(z.object({ engagementId: z.string(), fundName: z.string(), entityName: z.string(), analysed: z.boolean() })),
+        funds: z.array(
+          z.object({ engagementId: z.string(), fundName: z.string(), entityName: z.string(), analysed: z.boolean(), locked: z.boolean() })
+        ),
         latest: RunSummary.nullable(),
         analysedCount: z.number().int()
       })
@@ -44,7 +46,14 @@ export const ConsolidatedReviewResponse = z
       groupName: z.string(),
       yearEnd: z.string(),
       funds: z.array(
-        z.object({ engagementId: z.string(), fundName: z.string(), entityName: z.string(), currency: z.string(), analysed: z.boolean() })
+        z.object({
+          engagementId: z.string(),
+          fundName: z.string(),
+          entityName: z.string(),
+          currency: z.string(),
+          analysed: z.boolean(),
+          locked: z.boolean()
+        })
       )
     }),
     latest: RunSummary.nullable(),

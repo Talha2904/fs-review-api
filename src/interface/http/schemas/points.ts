@@ -18,12 +18,16 @@ export const PointSchema = z
     assignedTo: PersonSchema,
     raisedBy: PersonSchema,
     raisedAt: z.string(),
+    sharedGroupId: z.string().nullable().optional(),
     clearedBy: PersonSchema,
     clearedAt: z.string().nullable(),
     updatedAt: z.string()
   })
   .openapi('ReviewPoint');
 export const PointResponse = z.object({ point: PointSchema }).openapi('PointResponse');
+export const LinkSharedBody = z.object({ pointIds: z.array(z.string().min(3).max(64)).min(2).max(50) }).openapi('LinkSharedBody');
+export const SharePointBody = z.object({ engagementIds: z.array(z.string().min(1).max(64)).min(1).max(50) }).openapi('SharePointBody');
+export const SharedPointResponse = z.object({ sharedGroupId: z.string(), points: z.array(PointSchema) }).openapi('SharedPointResponse');
 
 export const AttachmentSchema = z.union([
   z.object({ type: z.literal('version'), slot: z.string(), versionId: z.string(), version: z.number().int(), fileName: z.string() }),

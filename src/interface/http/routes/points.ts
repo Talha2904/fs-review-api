@@ -15,12 +15,14 @@ import {
   ChecklistAnswerBody,
   CommentBody,
   EvidenceIdParams,
+  LinkSharedBody,
   ItemIdParams,
   JobIdParams,
   PointIdParams,
   PointMetaBody,
   RaisePointBody,
   ReportIdParams,
+  SharePointBody,
   SignoffBody,
   StartAnalysisBody
 } from '../schemas/points.js';
@@ -88,6 +90,28 @@ export function pointRoutes(uc: UseCases): Router {
           person(req.body.assignee)
         )
       });
+    } catch (e) {
+      next(e);
+    }
+  });
+  // ---- points shared across related funds: each fund keeps and clears its own copy ----
+  r.post('/points/shared', staff, validate({ body: LinkSharedBody }), async (req, res, next) => {
+    try {
+      res.json(await uc.linkSharedPoints.execute(req.actor, req.matrix, req.body.pointIds));
+    } catch (e) {
+      next(e);
+    }
+  });
+  r.post('/points/:pointId/share', staff, validate({ params: PointIdParams, body: SharePointBody }), async (req, res, next) => {
+    try {
+      res.json(await uc.sharePoint.execute(req.actor, req.matrix, String(req.params.pointId), req.body.engagementIds));
+    } catch (e) {
+      next(e);
+    }
+  });
+  r.delete('/points/:pointId/share', staff, validate({ params: PointIdParams }), async (req, res, next) => {
+    try {
+      res.json({ point: await uc.unsharePoint.execute(req.actor, req.matrix, String(req.params.pointId)) });
     } catch (e) {
       next(e);
     }

@@ -410,22 +410,24 @@ model DocumentReading {
 }
 
 model ReviewPoint {
-  id           String    @id
-  engagementId String    @map("engagement_id")
-  ref          String
+  id            String    @id
+  engagementId  String    @map("engagement_id")
+  ref           String
   /// content.title, kept in its own column so lists (the bell) need not read the whole content
-  title        String    @db.Text
-  source       String
-  content      Json
-  status       String
-  type         String
-  dueDate      String?   @map("due_date")
-  assignedTo   Json?     @map("assigned_to")
-  raisedBy     Json?     @map("raised_by")
-  raisedAt     DateTime  @map("raised_at")
-  clearedBy    Json?     @map("cleared_by")
-  clearedAt    DateTime? @map("cleared_at")
-  updatedAt    DateTime  @map("updated_at")
+  title         String    @db.Text
+  source        String
+  content       Json
+  status        String
+  type          String
+  dueDate       String?   @map("due_date")
+  assignedTo    Json?     @map("assigned_to")
+  raisedBy      Json?     @map("raised_by")
+  raisedAt      DateTime  @map("raised_at")
+  clearedBy     Json?     @map("cleared_by")
+  clearedAt     DateTime? @map("cleared_at")
+  updatedAt     DateTime  @map("updated_at")
+  /// one fund's copy of a matter shared across related funds; the copies share this id (meeting point 4)
+  sharedGroupId String?   @map("shared_group_id")
 
   engagement Engagement      @relation(fields: [engagementId], references: [id], onDelete: Restrict)
   messages   PointMessage[]
@@ -433,6 +435,7 @@ model ReviewPoint {
 
   @@unique([engagementId, ref])
   @@index([engagementId, status])
+  @@unique([sharedGroupId, engagementId])
   @@map("review_points")
 }
 

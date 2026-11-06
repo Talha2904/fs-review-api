@@ -3,7 +3,7 @@
 // engine pair balances and group recurring points, and, where the clients permit AI and it is turned on, asks
 // Claude only to pair what is named by role and to group points worded differently. It runs as a background
 // job like an analysis, records which analysis runs it read, and says when a fund has changed since.
-import type { PermissionMatrix } from '@fs-review/shared';
+import { isLockedSignoff, type PermissionMatrix } from '@fs-review/shared';
 import {
   aiInput,
   applyAiAnswer,
@@ -42,6 +42,7 @@ import type { JobQueue } from '../ports/JobQueue.js';
 import type { Logger } from '../ports/Logger.js';
 import type { PermissionRepository } from '../ports/PermissionRepository.js';
 import type { PointRepository } from '../ports/PointRepository.js';
+import type { SignoffRepository } from '../ports/SignoffRepository.js';
 import type { UserRepository } from '../ports/UserRepository.js';
 
 const who = (a: Actor): Person => ({ id: a.id, name: a.name, role: a.role });
@@ -116,6 +117,10 @@ export function staleness(review: ConsolidatedReviewRecord | null, group: Group,
   return changed.length || added.length || removed.length ? { changed, added, removed } : null;
 }
 
+/** Funds that are signed off: read-only, so no point can be shared into them. */
+const lockedFunds = async (signoffs: SignoffRepository) =>
+  new Set((await signoffs.listAll()).filter((x) => isLockedSignoff(x.state)).map((x) => x.engagementId));
+
 const summaryOf = (r: ConsolidatedReviewRecord | null) =>
   r && {
     id: r.id,
@@ -133,15 +138,17 @@ export class ListConsolidatedGroups {
     private readonly engagements: EngagementRepository,
     private readonly entities: EntityRepository,
     private readonly runs: AnalysisRunRepository,
-    private readonly reviews: ConsolidatedReviewRepository
+    private readonly reviews: ConsolidatedReviewRepository,
+    private readonly signoffs: SignoffRepository
   ) {}
 
   async execute(actor: Actor | null, matrix: PermissionMatrix) {
     requirePermission(actor, 'reviews.read', matrix);
-    const [groups, latestRuns, latest] = await Promise.all([
+    const [groups, latestRuns, latest, locked] = await Promise.all([
       loadGroups(this.engagements, this.entities),
       this.runs.latestAll(),
-      this.reviews.latestAll()
+      this.reviews.latestAll(),
+      lockedFunds(this.signoffs)
     ]);
     const runOf = new Map(latestRuns.map((r) => [r.engagementId, r.id]));
     return groups.map((g) => {
@@ -154,7 +161,8 @@ export class ListConsolidatedGroups {
           engagementId: f.engagementId,
           fundName: f.fundName,
           entityName: f.entityName,
-          analysed: runOf.has(f.engagementId)
+          analysed: runOf.has(f.engagementId),
+          locked: locked.has(f.engagementId)
         })),
         latest: summaryOf(last),
         // whether the last finished review is out of date is worked out on the review screen itself
@@ -169,17 +177,41 @@ export class GetConsolidatedReview {
     private readonly engagements: EngagementRepository,
     private readonly entities: EntityRepository,
     private readonly runs: AnalysisRunRepository,
-    private readonly reviews: ConsolidatedReviewRepository
+    private readonly reviews: ConsolidatedReviewRepository,
+    private readonly points: PointRepository,
+    private readonly signoffs: SignoffRepository
   ) {}
+
+  /** Each listed point as it is now (its status, and whether it is already shared): the review keeps refs only. */
+  private async live(result: Record<string, unknown> | null) {
+    const groups = (result?.groups as { points: { engagementId: string; ref: string; status: string }[] }[] | undefined) ?? [];
+    if (!groups.length) return result;
+    const funds = [...new Set(groups.flatMap((g) => g.points.map((p) => p.engagementId)))];
+    const byRef = new Map<string, { id: string; status: string; sharedGroupId: string | null }>();
+    for (const id of funds)
+      for (const p of await this.points.listByEngagement(id))
+        byRef.set(`${id}|${p.ref}`, { id: p.id, status: p.status, sharedGroupId: p.sharedGroupId ?? null });
+    return {
+      ...result,
+      groups: groups.map((g) => ({
+        ...g,
+        points: g.points.map((p) => {
+          const now = byRef.get(`${p.engagementId}|${p.ref}`);
+          return { ...p, pointId: now?.id ?? null, status: now?.status ?? 'removed', sharedGroupId: now?.sharedGroupId ?? null };
+        })
+      }))
+    };
+  }
 
   async execute(actor: Actor | null, matrix: PermissionMatrix, groupKey: string, yearEnd: string) {
     requirePermission(actor, 'reviews.read', matrix);
     const group = (await loadGroups(this.engagements, this.entities)).find((g) => g.groupKey === groupKey && g.yearEnd === yearEnd);
     if (!group) throw notFound('That group of funds');
-    const [latest, done, latestRuns] = await Promise.all([
+    const [latest, done, latestRuns, locked] = await Promise.all([
       this.reviews.latest(groupKey, yearEnd),
       this.reviews.latestDone(groupKey, yearEnd),
-      this.runs.latestAll()
+      this.runs.latestAll(),
+      lockedFunds(this.signoffs)
     ]);
     const runOf = new Map(latestRuns.map((r) => [r.engagementId, r.id]));
     return {
@@ -192,11 +224,14 @@ export class GetConsolidatedReview {
           fundName: f.fundName,
           entityName: f.entityName,
           currency: f.currency,
-          analysed: runOf.has(f.engagementId)
+          analysed: runOf.has(f.engagementId),
+          locked: locked.has(f.engagementId)
         }))
       },
       latest: summaryOf(latest),
-      review: done ? { id: done.id, finishedAt: done.finishedAt, requestedBy: done.requestedBy, result: done.result } : null,
+      review: done
+        ? { id: done.id, finishedAt: done.finishedAt, requestedBy: done.requestedBy, result: await this.live(done.result) }
+        : null,
       stale: staleness(done, group, runOf)
     };
   }

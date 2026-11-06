@@ -62,6 +62,9 @@ import {
   EvidenceIdParams,
   EvidenceResponse,
   ItemIdParams,
+  LinkSharedBody,
+  SharedPointResponse,
+  SharePointBody,
   PointIdParams,
   PointMetaBody,
   PointResponse,
@@ -649,6 +652,34 @@ export function buildOpenApi(version: string) {
     body: RaisePointBody,
     ok: PointResponse,
     errs: [400, 401, 403, 404, 423]
+  });
+  add({
+    method: 'post',
+    path: '/api/points/shared',
+    tags: ['Review points'],
+    summary: 'Link points that are the same matter in several related funds into one shared point',
+    body: LinkSharedBody,
+    ok: SharedPointResponse,
+    errs: [400, 401, 403, 404, 409]
+  });
+  add({
+    method: 'post',
+    path: '/api/points/{pointId}/share',
+    tags: ['Review points'],
+    summary: 'Share a point with other funds of its group (each gets its own SP copy)',
+    params: PointIdParams,
+    body: SharePointBody,
+    ok: SharedPointResponse,
+    errs: [400, 401, 403, 404, 409]
+  });
+  add({
+    method: 'delete',
+    path: '/api/points/{pointId}/share',
+    tags: ['Review points'],
+    summary: 'Stop sharing this fund’s copy of a point',
+    params: PointIdParams,
+    ok: PointResponse,
+    errs: [401, 403, 404, 409, 423]
   });
   add({
     method: 'put',

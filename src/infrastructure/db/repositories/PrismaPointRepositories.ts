@@ -1,6 +1,11 @@
 import type { PointStatus } from '@fs-review/shared';
 
-import type { EvidenceRepository, PointMessageRepository, PointRepository } from '../../../application/ports/PointRepository.js';
+import type {
+  EvidenceRepository,
+  PointMessageRepository,
+  PointRepository,
+  SharedChange
+} from '../../../application/ports/PointRepository.js';
 import { conflict } from '../../../domain/errors.js';
 import type { Person } from '../../../domain/review/Document.js';
 import type {
@@ -36,7 +41,8 @@ const pointToDomain = (r: PointRow): ReviewPoint => ({
   raisedAt: r.raisedAt.toISOString(),
   clearedBy: person(r.clearedBy),
   clearedAt: r.clearedAt ? r.clearedAt.toISOString() : null,
-  updatedAt: r.updatedAt.toISOString()
+  updatedAt: r.updatedAt.toISOString(),
+  sharedGroupId: r.sharedGroupId ?? null
 });
 
 const pointToRow = (p: ReviewPoint) => ({
@@ -53,7 +59,8 @@ const pointToRow = (p: ReviewPoint) => ({
   raisedAt: new Date(p.raisedAt),
   clearedBy: plain(p.clearedBy),
   clearedAt: p.clearedAt ? new Date(p.clearedAt) : null,
-  updatedAt: new Date(p.updatedAt)
+  updatedAt: new Date(p.updatedAt),
+  sharedGroupId: p.sharedGroupId ?? null
 });
 
 export class PrismaPointRepository implements PointRepository {
@@ -83,6 +90,32 @@ export class PrismaPointRepository implements PointRepository {
   async touch(id: string, at: string): Promise<void> {
     await this.db.reviewPoint.update({ where: { id }, data: { updatedAt: new Date(at) } });
   }
+  async saveShared(change: SharedChange): Promise<void> {
+    try {
+      await this.db.$transaction(async (tx) => {
+        for (const { point, expectedUpdatedAt } of change.update) {
+          const r = await tx.reviewPoint.updateMany({
+            where: { id: point.id, updatedAt: new Date(expectedUpdatedAt) },
+            data: pointToRow(point)
+          });
+          if (r.count !== 1) throw conflict(`${point.ref} was changed by someone else at the same moment. Reload it and try again.`);
+        }
+        for (const p of change.create) await tx.reviewPoint.create({ data: { id: p.id, ...pointToRow(p) } });
+        for (const m of change.messages) await tx.pointMessage.create({ data: messageToRow(m) });
+      });
+    } catch (e) {
+      // the same reference, or a second copy for one fund (unique shared_group_id + engagement_id)
+      if ((e as { code?: string }).code === 'P2002')
+        throw conflict('These points were shared by someone else at the same moment. Reload and try again.');
+      throw e;
+    }
+  }
+  async listBySharedGroups(groupIds: string[]): Promise<ReviewPoint[]> {
+    if (!groupIds.length) return [];
+    return (await this.db.reviewPoint.findMany({ where: { sharedGroupId: { in: groupIds } }, orderBy: { raisedAt: 'asc' } })).map(
+      pointToDomain
+    );
+  }
 }
 
 const messageToDomain = (r: MessageRow): PointMessage => ({
@@ -96,6 +129,17 @@ const messageToDomain = (r: MessageRow): PointMessage => ({
   attachments: (r.attachments as Attachment[]) ?? []
 });
 
+const messageToRow = (m: PointMessage) => ({
+  id: m.id,
+  pointId: m.pointId,
+  engagementId: m.engagementId,
+  kind: m.kind,
+  author: plain(m.author),
+  at: new Date(m.at),
+  text: m.text,
+  attachments: plain(m.attachments)
+});
+
 /** Insert only: this class has no update or delete method. */
 export class PrismaPointMessageRepository implements PointMessageRepository {
   constructor(private readonly db: Db) {}
@@ -105,19 +149,12 @@ export class PrismaPointMessageRepository implements PointMessageRepository {
   async listAll(): Promise<PointMessage[]> {
     return (await this.db.pointMessage.findMany({ orderBy: { at: 'asc' } })).map(messageToDomain);
   }
+  async listByPoints(pointIds: string[]): Promise<PointMessage[]> {
+    if (!pointIds.length) return [];
+    return (await this.db.pointMessage.findMany({ where: { pointId: { in: pointIds } }, orderBy: { at: 'asc' } })).map(messageToDomain);
+  }
   async create(m: PointMessage): Promise<void> {
-    await this.db.pointMessage.create({
-      data: {
-        id: m.id,
-        pointId: m.pointId,
-        engagementId: m.engagementId,
-        kind: m.kind,
-        author: plain(m.author),
-        at: new Date(m.at),
-        text: m.text,
-        attachments: plain(m.attachments)
-      }
-    });
+    await this.db.pointMessage.create({ data: messageToRow(m) });
   }
 }
 

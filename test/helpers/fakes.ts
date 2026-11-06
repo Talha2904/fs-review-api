@@ -83,7 +83,12 @@ import type { OcrEngine, OcrPage } from '../../src/application/ports/OcrEngine.j
 import type { PasswordHash, PasswordHasher } from '../../src/application/ports/PasswordHasher.js';
 import type { PasswordReset, PasswordResetRepository } from '../../src/application/ports/PasswordResetRepository.js';
 import type { PermissionRepository } from '../../src/application/ports/PermissionRepository.js';
-import type { EvidenceRepository, PointMessageRepository, PointRepository } from '../../src/application/ports/PointRepository.js';
+import type {
+  SharedChange,
+  EvidenceRepository,
+  PointMessageRepository,
+  PointRepository
+} from '../../src/application/ports/PointRepository.js';
 import type { FundActivity, PortfolioReadModel } from '../../src/application/ports/PortfolioReadModel.js';
 import type { DocumentReading, ReadingRepository } from '../../src/application/ports/ReadingRepository.js';
 import type { ReportRepository, ReviewReport } from '../../src/application/ports/ReportRepository.js';
@@ -124,6 +129,7 @@ import {
 } from '../../src/application/review/PointUseCases.js';
 import { GetNotifications, GetPortfolio } from '../../src/application/review/PortfolioUseCases.js';
 import { buildSnapshot, GetReviewSnapshot, ListReviewSnapshots } from '../../src/application/review/ReviewSnapshot.js';
+import { LinkSharedPoints, SharePoint, UnsharePoint } from '../../src/application/review/SharedPointUseCases.js';
 import { AddReport, DownloadReport, SetSignoff } from '../../src/application/review/SignoffUseCases.js';
 import { SetWorkflowState } from '../../src/application/review/WorkflowUseCases.js';
 import { ReviewAccess } from '../../src/application/review/access.js';
@@ -675,6 +681,29 @@ export class MemoryPoints implements PointRepository {
     const p = this.rows.get(id);
     if (p) this.rows.set(id, { ...p, updatedAt: at });
   }
+  /** the thread store, for saveShared (set when the world is built) */
+  messages?: MemoryMessages;
+  async saveShared(change: SharedChange) {
+    const rows = new Map(this.rows);
+    for (const { point, expectedUpdatedAt } of change.update) {
+      if (rows.get(point.id)?.updatedAt !== expectedUpdatedAt)
+        throw new AppError('CONFLICT', `${point.ref} was changed by someone else at the same moment.`);
+      rows.set(point.id, { ...point });
+    }
+    for (const p of change.create) rows.set(p.id, { ...p });
+    const all = [...rows.values()];
+    const clash = (key: (p: ReviewPoint) => string | null) => {
+      const keys = all.map(key).filter((k): k is string => !!k);
+      return new Set(keys).size !== keys.length;
+    };
+    if (clash((p) => `${p.engagementId}|${p.ref}`) || clash((p) => (p.sharedGroupId ? `${p.sharedGroupId}|${p.engagementId}` : null)))
+      throw new AppError('CONFLICT', 'These points were shared by someone else at the same moment.');
+    this.rows = rows;
+    this.messages?.rows.push(...change.messages);
+  }
+  async listBySharedGroups(groupIds: string[]) {
+    return [...this.rows.values()].filter((p) => p.sharedGroupId && groupIds.includes(p.sharedGroupId));
+  }
 }
 
 /** The portfolio read model over the in-memory stores (the Prisma one uses aggregate queries). */
@@ -769,6 +798,9 @@ export class MemoryMessages implements PointMessageRepository {
   }
   async listAll() {
     return [...this.rows];
+  }
+  async listByPoints(ids: string[]) {
+    return this.rows.filter((m) => ids.includes(m.pointId));
   }
   async create(m: PointMessage) {
     this.rows.push(m);
@@ -886,6 +918,7 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
   const readings = new MemoryReadings();
   const points = new MemoryPoints();
   const messages = new MemoryMessages();
+  points.messages = messages;
   const evidence = new MemoryEvidence();
   const answers = new MemoryAnswers();
   const reports = new MemoryReports();
@@ -983,8 +1016,8 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     saveChecklist: new SaveChecklist(checklists, ids, clock),
     getReviewSnapshot: new GetReviewSnapshot(access, snapshotSources),
     listReviewSnapshots: listSnapshots,
-    listConsolidatedGroups: new ListConsolidatedGroups(engagements, entities, runs, consolidated),
-    getConsolidatedReview: new GetConsolidatedReview(engagements, entities, runs, consolidated),
+    listConsolidatedGroups: new ListConsolidatedGroups(engagements, entities, runs, consolidated, signoffs),
+    getConsolidatedReview: new GetConsolidatedReview(engagements, entities, runs, consolidated, points, signoffs),
     startConsolidatedReview: new StartConsolidatedReview(engagements, entities, runs, consolidated, consolidatedQueue, ids, clock, events),
     getPortfolio: new GetPortfolio(
       engagements,
@@ -1016,6 +1049,9 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     assignPoint: new AssignPoint(access, points, messages, ids, clock, events, users),
     commentOnPoint: new CommentOnPoint(access, points, messages, ids, clock, events),
     actOnPoint: new ActOnPoint(access, points, messages, ids, clock, events, documents, evidence),
+    linkSharedPoints: new LinkSharedPoints(access, points, messages, engagements, entities, ids, clock, events, signoffs),
+    sharePoint: new SharePoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
+    unsharePoint: new UnsharePoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     addEvidence: new AddEvidence(access, points, evidence, storage, tokens, ids, clock),
     downloadEvidence: new DownloadEvidence(access, evidence, storage),
     answerChecklistItem: new AnswerChecklistItem(access, answers, clock, events),

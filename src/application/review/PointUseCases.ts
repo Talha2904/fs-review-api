@@ -78,6 +78,13 @@ class PointBase {
   protected async changed(engagementId: string): Promise<void> {
     await this.events.publish({ topic: 'review_points', engagementId, at: this.clock.nowIso() });
   }
+
+  /** A shared point's thread is read in every fund that has a copy, so each of those funds is told it changed. */
+  protected async changedPoint(p: ReviewPoint): Promise<void> {
+    const funds = new Set([p.engagementId]);
+    if (p.sharedGroupId) for (const x of await this.points.listBySharedGroups([p.sharedGroupId])) funds.add(x.engagementId);
+    for (const id of funds) await this.changed(id);
+  }
 }
 
 /** A manual point from the Analysis tab or a disclosure "No". The reference is made here so it is never reused. */
@@ -151,7 +158,7 @@ export class SetPointMeta extends PointBase {
     next.updatedAt = this.clock.nowIso();
     await this.points.update(next, p.updatedAt);
     await this.say(p, 'assign', who(by), notes.join(' '));
-    await this.changed(p.engagementId);
+    await this.changedPoint(p);
     return next;
   }
 }
@@ -164,7 +171,7 @@ export class AssignPoint extends PointBase {
     const next = { ...p, assignedTo: assignee, updatedAt: this.clock.nowIso() };
     await this.points.update(next, p.updatedAt);
     await this.say(p, 'assign', who(by), assignee ? `Assigned to ${assignee.name}.` : 'Unassigned.');
-    await this.changed(p.engagementId);
+    await this.changedPoint(p);
     return next;
   }
 }
@@ -182,7 +189,7 @@ export class CommentOnPoint extends PointBase {
     if (!String(text || '').trim()) throw validationFailed('Write the comment first.');
     await this.say(p, 'comment', who(by), String(text).trim());
     await this.points.touch(p.id, this.clock.nowIso());
-    await this.changed(p.engagementId);
+    await this.changedPoint(p);
   }
 }
 
@@ -257,7 +264,7 @@ export class ActOnPoint extends PointBase {
     const checked = await this.checkedAttachments(p, kind, attachments);
     await this.points.update(next, p.updatedAt);
     await this.say(p, kind, who(by), String(text || ''), checked);
-    await this.changed(p.engagementId);
+    await this.changedPoint(p);
     return next;
   }
 }

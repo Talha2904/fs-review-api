@@ -44,6 +44,11 @@ export interface ReviewPoint {
   clearedBy: Person | null;
   clearedAt: string | null;
   updatedAt: string;
+  /**
+   * Set when this point is one fund's copy of a matter shared across related funds (meeting point 4). Every copy
+   * keeps its own status and is cleared in its own fund; the copies share one thread when read.
+   */
+  sharedGroupId?: string | null;
 }
 
 export type MessageKind = 'raise' | 'assign' | 'comment' | 'response' | 'reopen' | 'clear' | 'note';

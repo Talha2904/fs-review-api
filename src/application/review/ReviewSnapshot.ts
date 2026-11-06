@@ -13,6 +13,7 @@ import type { ReportRepository, ReviewReport, ReviewReportView } from '../ports/
 import { EMPTY_SIGNOFF, type Signoff, type SignoffRepository } from '../ports/SignoffRepository.js';
 import { EMPTY_WORKFLOW, type Workflow, type WorkflowRepository } from '../ports/WorkflowRepository.js';
 
+import { sharedFor } from './SharedPointUseCases.js';
 import type { ReviewAccess } from './access.js';
 
 /** A fund's whole review, in the shape the web app's review store uses. */
@@ -30,6 +31,8 @@ export interface ReviewSnapshot {
   latestRun: AnalysisRun | (Omit<AnalysisRun, 'result'> & { result?: undefined }) | null;
   /** The latest analysis requested on the api: queued, running (with its step), done or failed. */
   analysisJob: AnalysisJob | null;
+  /** The other funds' copies of this fund's shared points and their threads (empty in the all-funds listing). */
+  shared: { points: ReviewPoint[]; messages: PointMessage[] };
 }
 
 interface Parts {
@@ -42,6 +45,7 @@ interface Parts {
   reports: ReviewReport[];
   latestRun: AnalysisRun | AnalysisRunSummary | null;
   latestJob: AnalysisJob | null;
+  shared?: { points: ReviewPoint[]; messages: PointMessage[] };
 }
 
 const reportView = (r: ReviewReport): ReviewReportView => {
@@ -70,7 +74,8 @@ export function buildSnapshot(engagementId: string, p: Parts, light = false): Re
     checklist: p.checklist,
     reports: [...p.reports].sort((a, b) => a.version - b.version).map(reportView),
     latestRun,
-    analysisJob: p.latestJob
+    analysisJob: p.latestJob,
+    shared: p.shared ?? { points: [], messages: [] }
   };
 }
 
@@ -104,7 +109,8 @@ export class GetReviewSnapshot {
       this.s.runs.latest(engagementId),
       this.s.jobs.latest(engagementId)
     ]);
-    return buildSnapshot(engagementId, { versions, workflow, signoff, points, messages, checklist, reports, latestRun, latestJob });
+    const shared = await sharedFor(this.s.points, this.s.messages, engagementId, points);
+    return buildSnapshot(engagementId, { versions, workflow, signoff, points, messages, checklist, reports, latestRun, latestJob, shared });
   }
 }
 
