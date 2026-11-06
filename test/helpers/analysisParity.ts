@@ -44,6 +44,8 @@ export async function runServerScenario(
   const ai = new AiAnalysisSteps(async (input: AiStepInput) => {
     aiCalls.push(input.step);
     await during?.(input.step);
+    // the analysis only ever makes the four analysis calls; the consolidated review is not one of them
+    if (input.step === 'consolidated') throw new Error('The analysis does not make the consolidated call.');
     return json(cannedAi(input.step, json(input) as unknown as Record<string, unknown>));
   }, reader);
   const result = await liveAnalysis(

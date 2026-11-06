@@ -515,3 +515,32 @@ model XeroConnection {
 
   @@map("xero_connection")
 }
+
+// ---- Phase 8: Consolidated Review across related entities --------------------------------------------
+
+/// One Consolidated Review of a group (every fund of the entities with the same Client name and year end):
+/// queued, running, done or failed. It keeps the analysis runs it read, so the screens can say when a fund
+/// has changed since. No foreign key: a group is not one engagement.
+model ConsolidatedReview {
+  id          String    @id
+  /// lower-cased Client name (else entity name)
+  groupKey    String    @map("group_key")
+  groupName   String    @map("group_name")
+  yearEnd     String    @map("year_end")
+  /// queued, running, done or failed
+  status      String
+  step        Int       @default(0)
+  total       Int
+  error       String?   @db.Text
+  /// engagementId -> the analysis run read (null when the fund was not analysed)
+  runIds      Json      @map("run_ids")
+  result      Json?
+  requestedBy Json      @map("requested_by")
+  createdAt   DateTime  @map("created_at")
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+
+  @@index([groupKey, yearEnd, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("consolidated_reviews")
+}

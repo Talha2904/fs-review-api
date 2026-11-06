@@ -21,6 +21,7 @@ import { aiRoutes } from './routes/ai.js';
 import { authRoutes } from './routes/auth.js';
 import { billingRoutes } from './routes/billing.js';
 import { configRoutes } from './routes/config.js';
+import { consolidatedRoutes } from './routes/consolidated.js';
 import { documentRoutes } from './routes/documents.js';
 import { eventRoutes } from './routes/events.js';
 import { healthRoutes, type HealthDeps } from './routes/health.js';
@@ -93,6 +94,7 @@ export function createApp(deps: AppDeps): Express {
   app.use('/api', documentRoutes(deps.uc));
   app.use('/api', pointRoutes(deps.uc));
   app.use('/api', portfolioRoutes(deps.uc));
+  app.use('/api', consolidatedRoutes(deps.uc));
   app.use(
     '/api',
     eventRoutes(deps.events, async (token) => !!(await deps.uc.resolveSession.execute(token)))

@@ -12,7 +12,7 @@ describe('AI settings', () => {
   it('unknown models fall back to the default and missing steps default on', () => {
     const s = normalizeAi({ model: 'gpt-9', steps: { narrative: false } });
     expect(s.model).toBe(DEFAULT_AI.model);
-    expect(s.steps).toEqual({ extract: true, narrative: false, explain: true, version: true });
+    expect(s.steps).toEqual({ extract: true, narrative: false, explain: true, version: true, consolidated: true });
   });
 
   it('labels steps', () => {

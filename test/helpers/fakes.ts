@@ -65,6 +65,11 @@ import type { CheckRuleConfig, CheckRuleConfigRepository } from '../../src/appli
 import type { ChecklistAnswerRepository, DisclosureChecklist } from '../../src/application/ports/ChecklistAnswerRepository.js';
 import type { ChecklistTemplate, ChecklistTemplateRepository } from '../../src/application/ports/ChecklistTemplateRepository.js';
 import type { Clock } from '../../src/application/ports/Clock.js';
+import type {
+  ConsolidatedReviewRecord,
+  ConsolidatedReviewRepository,
+  ConsolidatedStatus
+} from '../../src/application/ports/ConsolidatedReviewRepository.js';
 import type { DocumentChanges, DocumentRepository } from '../../src/application/ports/DocumentRepository.js';
 import type { EngagementRecord, EngagementRepository } from '../../src/application/ports/EngagementRepository.js';
 import type { EntityRecord, EntityRepository } from '../../src/application/ports/EntityRepository.js';
@@ -90,6 +95,13 @@ import type { Workflow, WorkflowRepository } from '../../src/application/ports/W
 import type { XeroClient, XeroCreatedInvoice, XeroInvoicePayload } from '../../src/application/ports/XeroClient.js';
 import type { XeroConnection, XeroConnectionRepository, XeroTokens } from '../../src/application/ports/XeroConnectionRepository.js';
 import { AnswerChecklistItem } from '../../src/application/review/ChecklistAnswerUseCases.js';
+import {
+  GetConsolidatedReview,
+  ListConsolidatedGroups,
+  RecoverConsolidatedReviews,
+  RunConsolidatedReview,
+  StartConsolidatedReview
+} from '../../src/application/review/ConsolidatedReviewUseCases.js';
 import {
   AttachDocument,
   AttachSampleDocument,
@@ -590,6 +602,41 @@ export class MemoryJobs implements AnalysisJobRepository {
   }
 }
 
+export class MemoryConsolidatedReviews implements ConsolidatedReviewRepository {
+  rows: ConsolidatedReviewRecord[] = [];
+  async createIfIdle(r: ConsolidatedReviewRecord) {
+    if (this.rows.some((x) => x.groupKey === r.groupKey && x.yearEnd === r.yearEnd && (x.status === 'queued' || x.status === 'running')))
+      return false;
+    this.rows.push(structuredClone(r));
+    return true;
+  }
+  async update(r: ConsolidatedReviewRecord) {
+    this.rows = this.rows.map((x) => (x.id === r.id ? structuredClone(r) : x));
+  }
+  async updateWhileRunning(r: ConsolidatedReviewRecord) {
+    if (this.rows.find((x) => x.id === r.id)?.status !== 'running') return false;
+    await this.update(r);
+    return true;
+  }
+  async findById(id: string) {
+    return this.rows.find((x) => x.id === id) ?? null;
+  }
+  async latest(groupKey: string, yearEnd: string) {
+    return [...this.rows].reverse().find((x) => x.groupKey === groupKey && x.yearEnd === yearEnd) ?? null;
+  }
+  async latestDone(groupKey: string, yearEnd: string) {
+    return [...this.rows].reverse().find((x) => x.groupKey === groupKey && x.yearEnd === yearEnd && x.status === 'done') ?? null;
+  }
+  async latestAll() {
+    const out = new Map<string, ConsolidatedReviewRecord>();
+    for (const x of this.rows) out.set(`${x.groupKey}|${x.yearEnd}`, { ...x, result: null });
+    return [...out.values()];
+  }
+  async listByStatus(statuses: ConsolidatedStatus[]) {
+    return this.rows.filter((x) => statuses.includes(x.status));
+  }
+}
+
 export class MemoryReadings implements ReadingRepository {
   rows = new Map<string, DocumentReading>();
   async get(key: string) {
@@ -799,6 +846,9 @@ export interface TestWorld {
   queue: InProcessJobQueue;
   readings: MemoryReadings;
   recoverJobs: RecoverAnalysisJobs;
+  consolidated: MemoryConsolidatedReviews;
+  consolidatedQueue: InProcessJobQueue;
+  recoverConsolidated: RecoverConsolidatedReviews;
   points: MemoryPoints;
   messages: MemoryMessages;
   answers: MemoryAnswers;
@@ -873,6 +923,25 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     logger: silentLogger
   });
   queue.handle((id) => runJob.execute(id));
+  const consolidated = new MemoryConsolidatedReviews();
+  const consolidatedQueue = new InProcessJobQueue(1, silentLogger);
+  const runConsolidated = new RunConsolidatedReview({
+    reviews: consolidated,
+    engagements,
+    entities,
+    runs,
+    points,
+    users,
+    permissions,
+    loadAi,
+    gateway: ai,
+    runAiStep,
+    activity,
+    clock,
+    events,
+    logger: silentLogger
+  });
+  consolidatedQueue.handle((id) => runConsolidated.execute(id));
 
   const uc: UseCases = {
     resolveSession: new ResolveSession(sessions, users, tokens, clock),
@@ -914,6 +983,9 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     saveChecklist: new SaveChecklist(checklists, ids, clock),
     getReviewSnapshot: new GetReviewSnapshot(access, snapshotSources),
     listReviewSnapshots: listSnapshots,
+    listConsolidatedGroups: new ListConsolidatedGroups(engagements, entities, runs, consolidated),
+    getConsolidatedReview: new GetConsolidatedReview(engagements, entities, runs, consolidated),
+    startConsolidatedReview: new StartConsolidatedReview(engagements, entities, runs, consolidated, consolidatedQueue, ids, clock, events),
     getPortfolio: new GetPortfolio(
       engagements,
       entities,
@@ -1007,6 +1079,9 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     queue,
     readings,
     recoverJobs: new RecoverAnalysisJobs(jobs, queue, clock),
+    consolidated,
+    consolidatedQueue,
+    recoverConsolidated: new RecoverConsolidatedReviews(consolidated, consolidatedQueue, clock, events),
     points,
     messages,
     answers,

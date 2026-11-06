@@ -15,6 +15,13 @@ import {
   XeroInvoiceBody
 } from './schemas/billing.js';
 import {
+  ConsolidatedGroupsResponse,
+  ConsolidatedReviewResponse,
+  GroupQuery,
+  StartConsolidatedBody,
+  StartConsolidatedResponse
+} from './schemas/consolidated.js';
+import {
   AttachResponse,
   ConfirmBody,
   EngagementIdParams,
@@ -596,6 +603,34 @@ export function buildOpenApi(version: string) {
     summary: 'Every fund: its stage, who it waits for, open, responded and overdue points (aggregate queries)',
     ok: PortfolioResponse,
     errs: [401, 403]
+  });
+  add({
+    method: 'get',
+    path: '/api/consolidated',
+    tags: ['Consolidated review'],
+    summary: 'Groups of two or more funds whose entities share a Client name and year end, with each group’s latest review',
+    ok: ConsolidatedGroupsResponse,
+    errs: [401, 403]
+  });
+  add({
+    method: 'get',
+    path: '/api/consolidated/review',
+    tags: ['Consolidated review'],
+    summary:
+      'A group’s latest finished review (inter-entity links, common review points, summary), any review in progress, and which funds changed since',
+    query: GroupQuery,
+    ok: ConsolidatedReviewResponse,
+    errs: [400, 401, 403, 404]
+  });
+  add({
+    method: 'post',
+    path: '/api/consolidated/runs',
+    tags: ['Consolidated review'],
+    summary: 'Start a Consolidated Review in the background. Answers 202; progress arrives on /api/events (topic consolidated_reviews).',
+    body: StartConsolidatedBody,
+    ok: StartConsolidatedResponse,
+    okStatus: 202,
+    errs: [400, 401, 403, 404, 409]
   });
   add({
     method: 'get',

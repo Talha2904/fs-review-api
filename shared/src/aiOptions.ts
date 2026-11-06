@@ -1,4 +1,4 @@
-// The four places the app uses AI, and the models an Administrator can choose. Shared by the api
+// The five places the app uses AI, and the models an Administrator can choose. Shared by the api
 // (which enforces the settings) and the web app (which explains them).
 
 export const AI_STEPS = [
@@ -25,6 +25,12 @@ export const AI_STEPS = [
     label: 'Version pass',
     desc: 'Decides which points a new draft resolved, which are still outstanding, and what is new.',
     off: 'A new draft is analysed as a fresh analysis; existing points keep their status and the reviewer decides.'
+  },
+  {
+    id: 'consolidated',
+    label: 'Consolidated review',
+    desc: 'Pairs balances between related entities that are named by role (such as the manager) and groups review points that recur across funds.',
+    off: 'The Consolidated Review still pairs balances that name each other and groups identical points, using the app’s own matching only.'
   }
 ] as const;
 export type AiStep = (typeof AI_STEPS)[number]['id'];
@@ -52,7 +58,7 @@ export interface AiSettings {
 export const DEFAULT_AI: AiSettings = {
   enabled: false,
   acknowledgement: null,
-  steps: { extract: true, narrative: true, explain: true, version: true },
+  steps: { extract: true, narrative: true, explain: true, version: true, consolidated: true },
   model: 'claude-sonnet-5-5'
 };
 

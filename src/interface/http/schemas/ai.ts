@@ -3,7 +3,14 @@ import { z } from 'zod';
 
 extendZodWithOpenApi(z);
 
-export const AiStepsSchema = z.object({ extract: z.boolean(), narrative: z.boolean(), explain: z.boolean(), version: z.boolean() });
+export const AiStepsSchema = z.object({
+  extract: z.boolean(),
+  narrative: z.boolean(),
+  explain: z.boolean(),
+  version: z.boolean(),
+  // optional so a client that does not know this step yet can still save the others (it then defaults on)
+  consolidated: z.boolean().optional()
+});
 export const AiSettingsSchema = z
   .object({
     enabled: z.boolean(),

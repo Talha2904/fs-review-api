@@ -24,6 +24,7 @@ import type { SignOut } from './identity/SignOut.js';
 import type { UpdateUser } from './identity/UpdateUser.js';
 import type { ReadScannedPages } from './ocr/ReadScannedPages.js';
 import type { AnswerChecklistItem } from './review/ChecklistAnswerUseCases.js';
+import type { GetConsolidatedReview, ListConsolidatedGroups, StartConsolidatedReview } from './review/ConsolidatedReviewUseCases.js';
 import type {
   AttachDocument,
   AttachSampleDocument,
@@ -61,6 +62,9 @@ export interface UseCases {
   getReviewSnapshot: GetReviewSnapshot;
   listReviewSnapshots: ListReviewSnapshots;
   getPortfolio: GetPortfolio;
+  listConsolidatedGroups: ListConsolidatedGroups;
+  getConsolidatedReview: GetConsolidatedReview;
+  startConsolidatedReview: StartConsolidatedReview;
   getNotifications: GetNotifications;
   attachDocument: AttachDocument;
   attachSampleDocument: AttachSampleDocument;

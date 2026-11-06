@@ -18,7 +18,9 @@ const ENTITY_TEXT: Record<string, string> = {
   'Private debt fund': 'a private debt fund (its loans may be held at fair value or at amortised cost, according to its stated policy)',
   'Investment manager': 'an investment management company (an operating company with revenue, staff costs and tax, not an investment fund)',
   'Trust or fiduciary company': 'a trust or fiduciary services company (an operating company, not an investment fund)',
-  'Other company': 'an operating company'
+  'Other company': 'an operating company',
+  // the Consolidated Review looks at several related entities at once
+  'Group of related entities': 'a group of related entities reviewed together: funds, their manager and other connected companies'
 };
 export const describeEntity = (type: string | null | undefined): string => ENTITY_TEXT[type ?? ''] ?? `an entity described as “${type}”`;
 export const describeFramework = (fw: string | null | undefined): string =>
@@ -144,7 +146,7 @@ const point = {
   ]
 };
 
-export const TOOLS: Record<'extract' | 'points' | 'variance' | 'versionPass', ToolSpec> = {
+export const TOOLS: Record<'extract' | 'points' | 'variance' | 'versionPass' | 'consolidated', ToolSpec> = {
   extract: {
     name: 'record_document',
     description: 'Record the transcribed document as display blocks plus normalised figures.',
@@ -207,6 +209,44 @@ export const TOOLS: Record<'extract' | 'points' | 'variance' | 'versionPass', To
         }
       },
       required: ['lines']
+    }
+  },
+  consolidated: {
+    name: 'record_consolidated_review',
+    description: 'Record the inter-entity pairs, the review points common to several funds, and a short summary.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pairs: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              a: { type: 'string', description: 'id of a line in one entity' },
+              b: { type: 'string', description: 'id of the line in another entity recording the same balance or transaction' },
+              relationship: { type: 'string', description: 'a few words, e.g. "Management fee: fund and manager"' },
+              note: { type: 'string', description: 'one sentence on why these two lines are the same balance' }
+            },
+            required: ['a', 'b', 'relationship', 'note']
+          }
+        },
+        groups: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'the shared matter, one sentence, sentence case' },
+              points: {
+                type: 'array',
+                items: { type: 'object', properties: { fund: { type: 'string' }, ref: { type: 'string' } }, required: ['fund', 'ref'] }
+              }
+            },
+            required: ['title', 'points']
+          }
+        },
+        summary: { type: 'string', description: 'two to four sentences for the partner' }
+      },
+      required: ['pairs', 'groups', 'summary']
     }
   },
   versionPass: {
@@ -324,6 +364,13 @@ For each line, identify its real economic driver (e.g. bond holdings for interes
 Escalate Explain → Investigate only where the movement runs against its driver or the evidence contradicts it. Never downgrade.
 Quote amounts in {CURRENCY} with thousands separators. Where no corroborating evidence is on file, say so.
 Keep each note to one or two short sentences: there may be many lines.`,
+
+  consolidated: (): string =>
+    `These are related entities reviewed together. You are given, for the entities whose clients permit AI: the entities (id, name, type); balance-sheet and related-party note lines that may involve another entity in the group (id, fund, where, label, amount, currency, side: receivable, payable, or flow for a charge or income in the year); and the open review points of each fund. A label may be a short sentence from a related-party note. Each line carries its own currency.
+1. Pairs: match a line in one entity with the line in another entity that records the same balance or transaction from the other side, e.g. a fund's management fee payable with the manager's fee receivable from that fund, or a loan receivable with the borrower's loan payable. Entities are often named by role ("the manager", "the general partner", "the parent"): use the entity types and names to decide which entity is meant. Pair only when the lines support it; never pair two lines of the same entity, and use each line at most once. Do not compute or restate differences: the app compares the amounts.
+2. Groups: list review points from two or more funds that describe the same matter, even if worded differently. Leave out points that only look alike.
+3. Summary: two to four sentences for the partner on the links found, which do not agree, and matters common to several funds.
+Return empty lists where nothing qualifies. Do not invent lines, points or ids.`,
 
   versionPass: (): string =>
     `A new draft of the financial statements has been received.

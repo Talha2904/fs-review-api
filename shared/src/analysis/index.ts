@@ -7,6 +7,7 @@ export * from './checkLibrary.js';
 export * from './tbMapping.js';
 export * from './docChecks.js';
 export * from './checks.js';
+export * from './consolidation.js';
 export * from './readers/lines.js';
 export * from './readers/tbReader.js';
 export * from './readers/isReader.js';

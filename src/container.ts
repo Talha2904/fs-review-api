@@ -43,6 +43,13 @@ import type { Logger } from './application/ports/Logger.js';
 import type { PermissionRepository } from './application/ports/PermissionRepository.js';
 import { AnswerChecklistItem } from './application/review/ChecklistAnswerUseCases.js';
 import {
+  GetConsolidatedReview,
+  ListConsolidatedGroups,
+  RecoverConsolidatedReviews,
+  RunConsolidatedReview,
+  StartConsolidatedReview
+} from './application/review/ConsolidatedReviewUseCases.js';
+import {
   AttachDocument,
   AttachSampleDocument,
   ConfirmDocument,
@@ -83,6 +90,7 @@ import { PrismaBillingRepository } from './infrastructure/db/repositories/Prisma
 import { PrismaCheckRuleConfigRepository } from './infrastructure/db/repositories/PrismaCheckRuleConfigRepository.js';
 import { PrismaChecklistAnswerRepository } from './infrastructure/db/repositories/PrismaChecklistAnswerRepository.js';
 import { PrismaChecklistTemplateRepository } from './infrastructure/db/repositories/PrismaChecklistTemplateRepository.js';
+import { PrismaConsolidatedReviewRepository } from './infrastructure/db/repositories/PrismaConsolidatedReviewRepository.js';
 import { PrismaDocumentRepository } from './infrastructure/db/repositories/PrismaDocumentRepository.js';
 import { PrismaEngagementRepository } from './infrastructure/db/repositories/PrismaEngagementRepository.js';
 import { PrismaEntityRepository } from './infrastructure/db/repositories/PrismaEntityRepository.js';
@@ -255,6 +263,27 @@ export function buildContainer(env: Env): Container {
   });
   queue.handle((jobId) => runAnalysisJob.execute(jobId));
   const recoverJobs = new RecoverAnalysisJobs(jobs, queue, clock);
+  // Consolidated Reviews have their own queue (one at a time) and their own table
+  const consolidatedReviews = new PrismaConsolidatedReviewRepository(db);
+  const consolidatedQueue = new InProcessJobQueue(1, logger);
+  const runConsolidated = new RunConsolidatedReview({
+    reviews: consolidatedReviews,
+    engagements,
+    entities,
+    runs,
+    points,
+    users,
+    permissions,
+    loadAi,
+    gateway,
+    runAiStep,
+    activity,
+    clock,
+    events,
+    logger
+  });
+  consolidatedQueue.handle((id) => runConsolidated.execute(id));
+  const recoverConsolidated = new RecoverConsolidatedReviews(consolidatedReviews, consolidatedQueue, clock, events);
 
   const uc: UseCases = {
     resolveSession: new ResolveSession(sessions, users, tokens, clock),
@@ -296,6 +325,18 @@ export function buildContainer(env: Env): Container {
     saveChecklist: new SaveChecklist(checklists, ids, clock),
     getReviewSnapshot: new GetReviewSnapshot(access, snapshotSources),
     listReviewSnapshots,
+    listConsolidatedGroups: new ListConsolidatedGroups(engagements, entities, runs, consolidatedReviews),
+    getConsolidatedReview: new GetConsolidatedReview(engagements, entities, runs, consolidatedReviews),
+    startConsolidatedReview: new StartConsolidatedReview(
+      engagements,
+      entities,
+      runs,
+      consolidatedReviews,
+      consolidatedQueue,
+      ids,
+      clock,
+      events
+    ),
     getPortfolio: new GetPortfolio(engagements, entities, users, new PrismaPortfolioReadModel(db), clock),
     getNotifications: new GetNotifications(engagements, entities, new PrismaBellReadModel(db, { workflows, signoffs, runs }), clock),
     attachDocument: new AttachDocument(access, documents, points, storage, tokens, ids, clock, events),
@@ -358,6 +399,10 @@ export function buildContainer(env: Env): Container {
         .execute()
         .then((r) => (r.failed || r.requeued ? logger.info(r, 'Recovered analysis jobs after a restart') : undefined))
         .catch((e) => logger.warn({ err: e }, 'Could not recover analysis jobs'));
+      recoverConsolidated
+        .execute()
+        .then((r) => (r.failed || r.requeued ? logger.info(r, 'Recovered consolidated reviews after a restart') : undefined))
+        .catch((e) => logger.warn({ err: e }, 'Could not recover consolidated reviews'));
       if (env.BILLING_FX_AUTO) {
         // twice a day, like the old server; failures are logged and retried next time
         timers.push(
@@ -370,7 +415,10 @@ export function buildContainer(env: Env): Container {
       // an analysis stuck for over 60 minutes is given up, so the fund can be analysed again
       timers.push(
         setInterval(
-          () => recoverJobs.reapStale(60).catch((e) => logger.warn({ err: e }, 'Could not check for stuck analysis jobs')),
+          () =>
+            Promise.all([recoverJobs.reapStale(60), recoverConsolidated.reapStale(60)]).catch((e) =>
+              logger.warn({ err: e }, 'Could not check for stuck analysis jobs')
+            ),
           5 * 60_000
         ).unref()
       );

@@ -39,13 +39,19 @@ export interface AiRequestContext {
   /** the entity's type and accounting framework, which the review applies */
   entityType?: string | null;
   framework?: string | null;
+  /**
+   * A call made for several funds at once (the Consolidated Review): its usage is recorded against each of
+   * them, split evenly, so every fund's AI usage is still billed and nothing is counted twice.
+   */
+  shareWith?: { engagementId: string; fundName: string | null }[];
 }
 
 export type AiStepInput =
   | { step: 'extract'; slot: unknown; file: unknown }
   | { step: 'narrative'; docs: Record<string, unknown>; threshold: number; highMultiple?: number; customChecks?: unknown }
   | { step: 'explain'; lines: unknown; docs: Record<string, unknown>; threshold: number; growth: number }
-  | { step: 'version'; priorPoints: unknown; candidatePoints: unknown; previousDraft: unknown; newDraft: unknown; supporting?: unknown };
+  | { step: 'version'; priorPoints: unknown; candidatePoints: unknown; previousDraft: unknown; newDraft: unknown; supporting?: unknown }
+  | { step: 'consolidated'; input: unknown };
 
 const fileBlock = (p: UploadedFile): ContentBlock => {
   if (p.mediaType === 'application/pdf')
@@ -129,16 +135,22 @@ export class RunAiStep {
         tool,
         maxTokens
       });
-      await this.activity.record({
-        actor: by,
-        category: 'AI',
-        summary: `AI: ${stepLabel(input.step)}`,
-        details: `${r.model} · ${r.inputTokens} tokens in, ${r.outputTokens} out`,
-        ip: ip ?? '',
-        engagementId: ctx.engagementId ?? null,
-        fundName: ctx.fundName ?? null,
-        usage: { step: input.step, model: r.model, input: r.inputTokens, output: r.outputTokens }
-      });
+      const funds = ctx.shareWith?.length ? ctx.shareWith : [{ engagementId: ctx.engagementId ?? null, fundName: ctx.fundName ?? null }];
+      const share = (total: number, i: number) => Math.floor(total / funds.length) + (i < total % funds.length ? 1 : 0);
+      for (const [i, f] of funds.entries()) {
+        const inT = share(r.inputTokens, i),
+          outT = share(r.outputTokens, i);
+        await this.activity.record({
+          actor: by,
+          category: 'AI',
+          summary: `AI: ${stepLabel(input.step)}`,
+          details: `${r.model} · ${inT} tokens in, ${outT} out${funds.length > 1 ? ` (share of one call for ${funds.length} funds)` : ''}`,
+          ip: ip ?? '',
+          engagementId: f.engagementId,
+          fundName: f.fundName,
+          usage: { step: input.step, model: r.model, input: inT, output: outT }
+        });
+      }
       return r.output;
     } catch (e) {
       if (e instanceof AppError) throw e;
@@ -198,6 +210,13 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.versionPass() }
           ],
           tool: TOOLS.versionPass,
+          maxTokens: STEP_TOKENS
+        };
+      case 'consolidated':
+        // compact lines and point titles only (built by the shared consolidation engine), never documents
+        return {
+          content: [json('group', input.input), { type: 'text' as const, text: PROMPTS.consolidated() }],
+          tool: TOOLS.consolidated,
           maxTokens: STEP_TOKENS
         };
     }
