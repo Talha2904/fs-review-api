@@ -491,7 +491,7 @@ export class RecoverAnalysisJobs {
     private readonly clock: Clock
   ) {}
   /** A job running far longer than any analysis takes is given up, so the fund is not blocked until a restart. */
-  async reapStale(maxMinutes = 30): Promise<number> {
+  async reapStale(maxMinutes = 60): Promise<number> {
     const cutoff = this.clock.now().getTime() - maxMinutes * 60_000;
     let n = 0;
     for (const job of await this.jobs.listByStatus(['running']))

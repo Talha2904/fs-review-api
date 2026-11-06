@@ -367,10 +367,10 @@ export function buildContainer(env: Env): Container {
           ).unref()
         );
       }
-      // an analysis stuck for over 30 minutes is given up, so the fund can be analysed again
+      // an analysis stuck for over 60 minutes is given up, so the fund can be analysed again
       timers.push(
         setInterval(
-          () => recoverJobs.reapStale(30).catch((e) => logger.warn({ err: e }, 'Could not check for stuck analysis jobs')),
+          () => recoverJobs.reapStale(60).catch((e) => logger.warn({ err: e }, 'Could not check for stuck analysis jobs')),
           5 * 60_000
         ).unref()
       );

@@ -20,20 +20,25 @@ export class AnthropicGateway implements AiGateway {
     try {
       // Current models reject `temperature` and a forced tool_choice ('tool' / 'any'), so the tool is offered
       // with 'auto' and the system prompt asks for exactly one call to it. This works on every Claude model.
-      const res = await client.messages.create({
-        model: call.model,
-        max_tokens: call.maxTokens,
-        system: `${call.system}\n\nAnswer only by calling the ${call.tool.name} tool, exactly once.`,
-        tools: [
-          {
-            name: call.tool.name,
-            description: call.tool.description,
-            input_schema: call.tool.input_schema as Anthropic.Tool['input_schema']
-          }
-        ],
-        tool_choice: { type: 'auto', disable_parallel_tool_use: true },
-        messages: [{ role: 'user', content: call.content as Anthropic.ContentBlockParam[] }]
-      });
+      // Streamed, so a long answer is not cut short: current models think before answering and that thinking
+      // counts towards max_tokens, and a request that is not streamed must stay small to avoid HTTP timeouts.
+      // finalMessage() returns the complete message, exactly as a non-streamed call would.
+      const res = await client.messages
+        .stream({
+          model: call.model,
+          max_tokens: call.maxTokens,
+          system: `${call.system}\n\nAnswer only by calling the ${call.tool.name} tool, exactly once.`,
+          tools: [
+            {
+              name: call.tool.name,
+              description: call.tool.description,
+              input_schema: call.tool.input_schema as Anthropic.Tool['input_schema']
+            }
+          ],
+          tool_choice: { type: 'auto', disable_parallel_tool_use: true },
+          messages: [{ role: 'user', content: call.content as Anthropic.ContentBlockParam[] }]
+        })
+        .finalMessage();
       // an answer cut off at the token limit may hold a partial tool call: never use it as if complete
       if (res.stop_reason === 'max_tokens')
         throw new AiGatewayError('Claude ran out of room before answering. Try again, or analyse fewer or smaller documents.');
@@ -68,9 +73,25 @@ export class AnthropicGateway implements AiGateway {
   }
 }
 
-function wrap(e: unknown): AiGatewayError {
+/** The HTTP status each API error type stands for, for an error that arrives inside a streamed answer (it has a type, no status). */
+const TYPE_STATUS: Record<string, number> = {
+  overloaded_error: 529,
+  rate_limit_error: 429,
+  api_error: 500,
+  authentication_error: 401,
+  permission_error: 403,
+  not_found_error: 404
+};
+
+/** Turns an SDK error into the gateway's own, with the status plainAiError reads. Exported for its tests. */
+export function wrap(e: unknown): AiGatewayError {
   if (e instanceof AiGatewayError) return e;
-  const status = typeof (e as { status?: unknown })?.status === 'number' ? (e as { status: number }).status : undefined;
-  const message = e instanceof Error ? e.message : String(e);
-  return new AiGatewayError(message, status);
+  const err = e as { status?: unknown; type?: unknown; error?: { error?: { type?: unknown } } };
+  const type = typeof err?.type === 'string' ? err.type : typeof err?.error?.error?.type === 'string' ? err.error.error.type : undefined;
+  const status = typeof err?.status === 'number' ? err.status : type ? TYPE_STATUS[type] : undefined;
+  // An SDK error with neither a status nor an API error type: the connection broke (a dropped stream, a
+  // network or proxy failure, a timeout), so say that rather than show the transport's own wording.
+  if (status === undefined && !type && e instanceof Anthropic.AnthropicError)
+    return new AiGatewayError('The connection to Claude was interrupted before it finished answering. Try again.');
+  return new AiGatewayError(e instanceof Error ? e.message : String(e), status);
 }

@@ -57,6 +57,15 @@ const json = (name: string, obj: unknown): ContentBlock => ({
   type: 'text',
   text: `<${name}>\n${JSON.stringify(obj ?? null)}\n</${name}>`
 });
+/**
+ * The most Claude may write in one answer, thinking included. Calls are streamed (AnthropicGateway), so this
+ * can be well above the 21,000 a request that is not streamed allows. It is a ceiling, not a charge: only the
+ * tokens Claude writes are billed. Current models allow up to 128,000. The review writes the most (18,307 seen in
+ * production); the other steps under 14,000. Kept below the maximum so a whole analysis stays well inside the
+ * 60 minutes after which a job is treated as stuck.
+ */
+const REVIEW_TOKENS = 64000;
+const STEP_TOKENS = 32000;
 /** A workbook as CSV text, when there is one; capped so one large file cannot crowd out the rest. */
 const WORKBOOK_CHARS = 150_000;
 const workbook = (name: string, text: unknown): ContentBlock[] =>
@@ -148,7 +157,7 @@ export class RunAiStep {
         return {
           content: [fileBlock(file), { type: 'text' as const, text: PROMPTS.extract(slot).replaceAll('{CURRENCY}', currency) + umb }],
           tool: TOOLS.extract,
-          maxTokens: 16000
+          maxTokens: STEP_TOKENS
         };
       }
       case 'narrative':
@@ -165,8 +174,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.narrative(input.threshold, input.highMultiple, input.customChecks) }
           ],
           tool: TOOLS.points,
-          // below the SDK's limit for a request that is not streamed (about 21,000)
-          maxTokens: 20000
+          maxTokens: REVIEW_TOKENS
         };
       case 'explain':
         return {
@@ -177,7 +185,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.variance(input.threshold, input.growth) }
           ],
           tool: TOOLS.variance,
-          maxTokens: 20000
+          maxTokens: STEP_TOKENS
         };
       case 'version':
         return {
@@ -190,7 +198,7 @@ export class RunAiStep {
             { type: 'text' as const, text: PROMPTS.versionPass() }
           ],
           tool: TOOLS.versionPass,
-          maxTokens: 16000
+          maxTokens: STEP_TOKENS
         };
     }
   }
