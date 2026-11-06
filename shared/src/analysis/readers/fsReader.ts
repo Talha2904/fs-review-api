@@ -137,18 +137,19 @@ export function layoutBlocks(lines: PdfLine[], names: string[] = []): Block[] {
     const v: (number | null)[] = (cols as string[]).map(() => null);
     const xs = colX as number[];
     if (nums.length === v.length) nums.forEach((c, j) => (v[j] = parseAmount(c.str)));
-    else nums.forEach((c) => {
-      let best = 0,
-        d = Infinity;
-      xs.forEach((x, j) => {
-        const dd = Math.abs(x - c.x2);
-        if (dd < d) {
-          d = dd;
-          best = j;
-        }
+    else
+      nums.forEach((c) => {
+        let best = 0,
+          d = Infinity;
+        xs.forEach((x, j) => {
+          const dd = Math.abs(x - c.x2);
+          if (dd < d) {
+            d = dd;
+            best = j;
+          }
+        });
+        v[best] = parseAmount(c.str);
       });
-      v[best] = parseAmount(c.str);
-    });
     table.rows!.push({ l: label, v, ...(TOTAL.test(label) ? { b: true } : {}), ...(/per share/i.test(label) ? { dp: 4 } : {}) });
   }
   return blocks.filter((b) => b.k !== 'table' || b.rows!.length);
@@ -268,7 +269,9 @@ export function statementFigures(blocks: Block[]): Figures {
         continue;
       }
       // funds: net assets attributable; companies and partnerships: equity, partners' or members' capital
-      if (/^net assets attributable|^net assets(\s*\/\s*equity)?$|^total (equity|partners'? capital|members'? (equity|interests))$/i.test(r.l)) {
+      if (
+        /^net assets attributable|^net assets(\s*\/\s*equity)?$|^total (equity|partners'? capital|members'? (equity|interests))$/i.test(r.l)
+      ) {
         F.statedNA = r.cy;
         phase = 'after';
         continue;
@@ -292,7 +295,9 @@ export function statementFigures(blocks: Block[]): Figures {
     }
     const ex = sci.find((r) => /operating expenses|^total expenses|^expenses/i.test(r.l));
     if (ex) F.sciExp = Math.abs(val(ex.cy));
-    const op = sci.find((r) => /(increase|decrease) in net assets.*operations|^(net )?(profit|loss|income) for the (year|period)/i.test(r.l));
+    const op = sci.find((r) =>
+      /(increase|decrease) in net assets.*operations|^(net )?(profit|loss|income) for the (year|period)/i.test(r.l)
+    );
     if (op) F.ops = op.cy;
   }
   // Statement of changes in net assets
@@ -303,7 +308,9 @@ export function statementFigures(blocks: Block[]): Figures {
       F.pyNA = open.cy;
       if (open.py != null) F.pyOpenNA = open.py;
     }
-    const sub = socna.find((r) => /subscription|issue of (redeemable )?(participating )?shares|capital contributions?|^contributions?$/i.test(r.l));
+    const sub = socna.find((r) =>
+      /subscription|issue of (redeemable )?(participating )?shares|capital contributions?|^contributions?$/i.test(r.l)
+    );
     if (sub) F.subs = Math.abs(val(sub.cy));
     const red = socna.find((r) => /redemption|withdrawals? of capital/i.test(r.l));
     if (red) F.reds = Math.abs(val(red.cy));

@@ -39,11 +39,7 @@ export class AnthropicGateway implements AiGateway {
         throw new AiGatewayError('Claude ran out of room before answering. Try again, or analyse fewer or smaller documents.');
       const out = res.content.find((b) => b.type === 'tool_use' && b.name === call.tool.name);
       if (!out || out.type !== 'tool_use')
-        throw new AiGatewayError(
-          res.stop_reason === 'refusal'
-              ? 'Claude declined this request.'
-              : 'Claude returned no structured output'
-        );
+        throw new AiGatewayError(res.stop_reason === 'refusal' ? 'Claude declined this request.' : 'Claude returned no structured output');
       return {
         output: out.input as T,
         model: res.model,

@@ -127,7 +127,21 @@ const point = {
     },
     missing: { type: 'string', description: 'information still needed to conclude; empty if none' }
   },
-  required: ['pri', 'area', 'title', 'basis', 'amount', 'refs', 'follow', 'anchor', 'kind', 'evidence', 'fix', 'pbtEffect', 'netAssetsEffect']
+  required: [
+    'pri',
+    'area',
+    'title',
+    'basis',
+    'amount',
+    'refs',
+    'follow',
+    'anchor',
+    'kind',
+    'evidence',
+    'fix',
+    'pbtEffect',
+    'netAssetsEffect'
+  ]
 };
 
 export const TOOLS: Record<'extract' | 'points' | 'variance' | 'versionPass', ToolSpec> = {
@@ -154,7 +168,8 @@ export const TOOLS: Record<'extract' | 'points' | 'variance' | 'versionPass', To
         points: { type: 'array', items: point },
         summary: {
           type: 'string',
-          description: 'director-level summary in three to five sentences: the main matters and their combined effect on profit and net assets'
+          description:
+            'director-level summary in three to five sentences: the main matters and their combined effect on profit and net assets'
         },
         readyForApproval: { type: 'boolean', description: 'false while any matter should prevent approval' },
         blockers: { type: 'array', items: { type: 'string' }, description: 'titles of the matters that should prevent approval' }

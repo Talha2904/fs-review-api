@@ -1,8 +1,9 @@
-import { can } from '@fs-review/shared';
 import { Router } from 'express';
 
-import { staffView } from '../../../application/activity/ListActivity.js';
+import { can } from '@fs-review/shared';
+
 import type { UseCases } from '../../../application/UseCases.js';
+import { staffView } from '../../../application/activity/ListActivity.js';
 import { ipOf, requirePerm } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { ActivityBody, ActivityQuery } from '../schemas/activity.js';

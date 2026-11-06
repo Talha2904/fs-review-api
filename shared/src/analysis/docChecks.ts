@@ -66,7 +66,13 @@ export function castAll(cy: Doc | null | undefined, tol = 1): CastResult[] {
       rows.forEach((r, k) => {
         const closing = r.v![last] as number,
           sum = r.v!.slice(0, last).reduce<number>((s, x) => s + (x || 0), 0);
-        results.push({ where: `${head} · ${r.l} (across)`, col: String(tc[last]), stated: closing, comp: sum, ok: Math.abs(sum - closing) <= tol });
+        results.push({
+          where: `${head} · ${r.l} (across)`,
+          col: String(tc[last]),
+          stated: closing,
+          comp: sum,
+          ok: Math.abs(sum - closing) <= tol
+        });
         const nxt = rows[k + 1];
         if (nxt) {
           const opening = nxt.v![0] as number;

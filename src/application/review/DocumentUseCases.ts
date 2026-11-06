@@ -58,7 +58,8 @@ export class AttachDocument {
   ): Promise<AttachResult> {
     // Two uploads are allowed while the documents are marked ready: a revised document on a response to an
     // open point, and the next draft of the statements for the version pass (which needs them ready).
-    if (opts.nextDraft && slot !== 'cy') throw validationFailed('Only a new draft of the financial statements can be attached as the next draft.');
+    if (opts.nextDraft && slot !== 'cy')
+      throw validationFailed('Only a new draft of the financial statements can be attached as the next draft.');
     const by = opts.responseTo
       ? await this.access.documentWriter(actor, matrix, engagementId, ['points.respond'], { whileReady: true })
       : opts.nextDraft
