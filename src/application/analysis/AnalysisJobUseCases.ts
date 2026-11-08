@@ -318,7 +318,8 @@ export class RunAnalysisJob {
                     currency: ctx.currency,
                     umbrella: ctx.umbrella ? ctx.umbrellaName : null,
                     entityType: String(ctx.entity?.entityType ?? ''),
-                    framework: String(ctx.entity?.framework ?? '')
+                    framework: String(ctx.entity?.framework ?? ''),
+                    periodEnd: String(ctx.engagement.fund?.yearEnd ?? '')
                   }),
                 this.d.reader
               ),

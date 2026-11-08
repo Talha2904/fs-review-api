@@ -71,7 +71,7 @@ import {
 } from './application/review/PointUseCases.js';
 import { GetNotifications, GetPortfolio } from './application/review/PortfolioUseCases.js';
 import { GetReviewSnapshot, ListReviewSnapshots } from './application/review/ReviewSnapshot.js';
-import { LinkSharedPoints, SharePoint, UnsharePoint } from './application/review/SharedPointUseCases.js';
+import { LinkSharedPoints, RaiseCommonPoint, SharePoint, UnsharePoint } from './application/review/SharedPointUseCases.js';
 import { AddReport, DownloadReport, SetSignoff } from './application/review/SignoffUseCases.js';
 import { SetWorkflowState } from './application/review/WorkflowUseCases.js';
 import { ReviewAccess } from './application/review/access.js';
@@ -119,6 +119,7 @@ import { InProcessJobQueue } from './infrastructure/jobs/InProcessJobQueue.js';
 import { createHttpLogger, createLogger } from './infrastructure/logging/logger.js';
 import { NodemailerMailer } from './infrastructure/mail/NodemailerMailer.js';
 import { TesseractEngine } from './infrastructure/ocr/TesseractEngine.js';
+import { FileStandardsLibrary } from './infrastructure/standards/FileStandardsLibrary.js';
 import { LocalDiskStorage } from './infrastructure/storage/LocalDiskStorage.js';
 import { S3Storage } from './infrastructure/storage/S3Storage.js';
 import { XeroHttpClient } from './infrastructure/xero/XeroHttpClient.js';
@@ -231,7 +232,7 @@ export function buildContainer(env: Env): Container {
   const loadAi = new LoadAiSettings(aiSettings, env.CLAUDE_MODEL);
   const billingActions = new BillingActions(billing, log, clock, ids, activity);
   const refreshFxRate = new RefreshFxRate(billingActions, rates);
-  const runAiStep = new RunAiStep(loadAi, gateway, activity);
+  const runAiStep = new RunAiStep(loadAi, gateway, activity, env.AI_STANDARDS === 'off' ? undefined : new FileStandardsLibrary(logger));
   const saveAnalysisRun = new SaveAnalysisRun(access, runs, documents, workflows, ids, clock, events);
   const syncAnalysisPoints = new SyncAnalysisPoints(access, points, messages, ids, clock, events);
   const analysisContexts = new AnalysisContextLoader(
@@ -360,6 +361,7 @@ export function buildContainer(env: Env): Container {
     linkSharedPoints: new LinkSharedPoints(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     sharePoint: new SharePoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     unsharePoint: new UnsharePoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
+    raiseCommonPoint: new RaiseCommonPoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     addEvidence: new AddEvidence(access, points, evidence, storage, tokens, ids, clock),
     downloadEvidence: new DownloadEvidence(access, evidence, storage),
     answerChecklistItem: new AnswerChecklistItem(access, answers, clock, events),

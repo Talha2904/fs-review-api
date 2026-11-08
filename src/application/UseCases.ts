@@ -47,7 +47,7 @@ import type {
 } from './review/PointUseCases.js';
 import type { GetNotifications, GetPortfolio } from './review/PortfolioUseCases.js';
 import type { GetReviewSnapshot, ListReviewSnapshots } from './review/ReviewSnapshot.js';
-import type { LinkSharedPoints, SharePoint, UnsharePoint } from './review/SharedPointUseCases.js';
+import type { LinkSharedPoints, RaiseCommonPoint, SharePoint, UnsharePoint } from './review/SharedPointUseCases.js';
 import type { AddReport, DownloadReport, SetSignoff } from './review/SignoffUseCases.js';
 import type { SetWorkflowState } from './review/WorkflowUseCases.js';
 
@@ -87,6 +87,7 @@ export interface UseCases {
   linkSharedPoints: LinkSharedPoints;
   sharePoint: SharePoint;
   unsharePoint: UnsharePoint;
+  raiseCommonPoint: RaiseCommonPoint;
   addEvidence: AddEvidence;
   downloadEvidence: DownloadEvidence;
   answerChecklistItem: AnswerChecklistItem;

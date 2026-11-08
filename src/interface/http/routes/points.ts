@@ -14,6 +14,7 @@ import {
   AssignBody,
   ChecklistAnswerBody,
   CommentBody,
+  CommonPointBody,
   EvidenceIdParams,
   LinkSharedBody,
   ItemIdParams,
@@ -98,6 +99,13 @@ export function pointRoutes(uc: UseCases): Router {
   r.post('/points/shared', staff, validate({ body: LinkSharedBody }), async (req, res, next) => {
     try {
       res.json(await uc.linkSharedPoints.execute(req.actor, req.matrix, req.body.pointIds));
+    } catch (e) {
+      next(e);
+    }
+  });
+  r.post('/points/common', staff, validate({ body: CommonPointBody }), async (req, res, next) => {
+    try {
+      res.json(await uc.raiseCommonPoint.execute(req.actor, req.matrix, req.body.engagementIds, req.body.content));
     } catch (e) {
       next(e);
     }

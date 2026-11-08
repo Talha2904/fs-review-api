@@ -59,6 +59,7 @@ import {
   ChecklistAnswerBody,
   ChecklistStateResponse,
   CommentBody,
+  CommonPointBody,
   EvidenceIdParams,
   EvidenceResponse,
   ItemIdParams,
@@ -659,6 +660,15 @@ export function buildOpenApi(version: string) {
     tags: ['Review points'],
     summary: 'Link points that are the same matter in several related funds into one shared point',
     body: LinkSharedBody,
+    ok: SharedPointResponse,
+    errs: [400, 401, 403, 404, 409]
+  });
+  add({
+    method: 'post',
+    path: '/api/points/common',
+    tags: ['Review points'],
+    summary: 'Raise a common review point: one matter raised in several related funds at once, each fund clearing its own copy',
+    body: CommonPointBody,
     ok: SharedPointResponse,
     errs: [400, 401, 403, 404, 409]
   });

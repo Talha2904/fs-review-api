@@ -16,10 +16,12 @@ import type { Actor } from '../../domain/identity/User.js';
 import type { ActivityRecorder } from '../activity/ActivityRecorder.js';
 import { requirePermission } from '../identity/authorize.js';
 import type { AiGateway, ContentBlock } from '../ports/AiGateway.js';
+import type { StandardsLibrary } from '../ports/StandardsLibrary.js';
 
 import type { LoadAiSettings } from './AiSettingsUseCases.js';
 import { plainAiError } from './aiErrors.js';
-import { describeEntity, describeFramework, PROMPTS, SYSTEM, TOOLS } from './prompts.js';
+import { describeEntity, describeFramework, PROMPTS, STANDARDS_RULE, SYSTEM, TOOLS } from './prompts.js';
+import { checkCitations, draftQuery, extractsBlock, inForce, periodStart, selectPassages, standardsFramework } from './standardsSearch.js';
 
 export interface UploadedFile {
   fileName: string;
@@ -39,6 +41,8 @@ export interface AiRequestContext {
   /** the entity's type and accounting framework, which the review applies */
   entityType?: string | null;
   framework?: string | null;
+  /** the fund's year end: which standards are in force for its period */
+  periodEnd?: string | null;
   /**
    * A call made for several funds at once (the Consolidated Review): its usage is recorded against each of
    * them, split evenly, so every fund's AI usage is still billed and nothing is counted twice.
@@ -105,8 +109,27 @@ export class RunAiStep {
   constructor(
     private readonly load: LoadAiSettings,
     private readonly gateway: AiGateway,
-    private readonly activity: ActivityRecorder
+    private readonly activity: ActivityRecorder,
+    /** the FRS 102 and IFRS passages the narrative review cites (Phase 6); without it the review runs as before */
+    private readonly standards?: StandardsLibrary
   ) {}
+
+  /** The passages of the fund's framework most relevant to its draft, as one text block; null when none apply. */
+  private async extracts(
+    input: AiStepInput,
+    ctx: AiRequestContext,
+    useStandards: boolean
+  ): Promise<{ block: string; count: number; refs: Set<string> } | null> {
+    if (input.step !== 'narrative' || !this.standards || !useStandards) return null;
+    const fw = standardsFramework(ctx.framework);
+    if (!fw) return null;
+    // only what is in force for this fund's period (worked out from its year end at every review)
+    const start = periodStart(ctx.periodEnd);
+    const chosen = selectPassages(inForce(fw, await this.standards.passages(fw), start), draftQuery(input.docs.cy, ctx.entityType));
+    return chosen.length
+      ? { block: extractsBlock(fw, chosen, start), count: chosen.length, refs: new Set(chosen.map((p) => p.ref)) }
+      : null;
+  }
 
   async execute(actor: Actor | null, matrix: PermissionMatrix, input: AiStepInput, ctx: AiRequestContext, ip?: string): Promise<unknown> {
     const by = requirePermission(actor, 'analysis.run', matrix);
@@ -124,7 +147,9 @@ export class RunAiStep {
     if (stop) throw new AppError('AI_UNAVAILABLE', stop, { aiOff: true });
 
     const currency = /^[A-Z]{3}$/.test(ctx.currency || '') ? ctx.currency : 'GBP';
-    const { content, tool, maxTokens } = this.build(input, ctx.umbrella ?? null, currency);
+    // the standards add context only: if they cannot be read or searched, the review runs without them
+    const standards = await this.extracts(input, ctx, ai.standards !== false).catch(() => null);
+    const { content, tool, maxTokens } = this.build(input, ctx.umbrella ?? null, currency, standards?.block ?? null);
     try {
       const r = await this.gateway.structured({
         model: ai.model,
@@ -144,21 +169,21 @@ export class RunAiStep {
           actor: by,
           category: 'AI',
           summary: `AI: ${stepLabel(input.step)}`,
-          details: `${r.model} · ${inT} tokens in, ${outT} out${funds.length > 1 ? ` (share of one call for ${funds.length} funds)` : ''}`,
+          details: `${r.model} · ${inT} tokens in, ${outT} out${funds.length > 1 ? ` (share of one call for ${funds.length} funds)` : ''}${standards ? ` · ${standards.count} standards paragraphs` : ''}`,
           ip: ip ?? '',
           engagementId: f.engagementId,
           fundName: f.fundName,
           usage: { step: input.step, model: r.model, input: inT, output: outT }
         });
       }
-      return r.output;
+      return standards ? withCheckedCitations(r.output, standards.refs) : r.output;
     } catch (e) {
       if (e instanceof AppError) throw e;
       throw new AppError('AI_UNAVAILABLE', plainAiError(e));
     }
   }
 
-  private build(input: AiStepInput, umbrella: string | null, currency: string) {
+  private build(input: AiStepInput, umbrella: string | null, currency: string, standards: string | null = null) {
     switch (input.step) {
       case 'extract': {
         const { slot, file } = checkUpload(input.slot, input.file);
@@ -183,7 +208,11 @@ export class RunAiStep {
             // whole workbooks, every sheet: the readings above keep only the accounts and the holdings
             ...workbook('trial_balance_workbook', input.docs.tbText),
             ...workbook('supporting_schedules_workbook', input.docs.isText),
-            { type: 'text' as const, text: PROMPTS.narrative(input.threshold, input.highMultiple, input.customChecks) }
+            ...(standards ? [{ type: 'text' as const, text: standards }] : []),
+            {
+              type: 'text' as const,
+              text: PROMPTS.narrative(input.threshold, input.highMultiple, input.customChecks) + (standards ? STANDARDS_RULE : '')
+            }
           ],
           tool: TOOLS.points,
           maxTokens: REVIEW_TOKENS
@@ -224,3 +253,10 @@ export class RunAiStep {
 }
 
 export type { AiStep };
+
+/** Every point's references, with any paragraph of the standards that was not sent cut back to the standard's name. */
+function withCheckedCitations(output: unknown, sent: Set<string>): unknown {
+  const o = output as { points?: { refs?: unknown }[] } | null;
+  if (!o || !Array.isArray(o.points)) return output;
+  return { ...o, points: o.points.map((p) => (p && typeof p.refs === 'string' ? { ...p, refs: checkCitations(p.refs, sent) } : p)) };
+}

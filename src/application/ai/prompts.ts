@@ -308,6 +308,11 @@ const customBlock = (list: unknown): string => {
     .join('\n')}\n</firm_rules>`;
 };
 
+/** Added to the narrative review when passages of the fund's standards are sent with it (Phase 6). */
+export const STANDARDS_RULE = `
+
+Standards: the standards_extracts block holds the passages of the entity’s accounting framework most relevant to this draft, each under its reference. Where a point relies on a requirement of the standards, cite the passage’s reference in refs (for example "FRS 102 33.9" or "IAS 24 18") and apply its wording. Cite only references that appear in the block; for a requirement that is not in it, name the standard and section without a paragraph number. The block begins with a note on its edition and on what is not yet in force for this period: apply only requirements in force for the period, and do not cite a paragraph that the note says may show later wording unless its requirement already applied. The extracts are context, not findings: raise a matter only when the documents show it.`;
+
 export const PROMPTS = {
   extract: (slot: Slot): string => {
     const keys = FIGURE_KEYS[slot] || {};

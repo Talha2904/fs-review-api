@@ -54,6 +54,8 @@ const schema = z.object({
   REDIS_URL: z.string().url().optional(),
 
   ANTHROPIC_API_KEY: z.string().optional(),
+  // 'off' runs the AI review without the FRS 102 and IFRS passages (Phase 6), as it ran before
+  AI_STANDARDS: z.enum(['on', 'off']).default('on'),
   CLAUDE_MODEL: z.string().default('claude-sonnet-5-5'),
 
   /** Where Tesseract caches its language data; relative to the api folder. */

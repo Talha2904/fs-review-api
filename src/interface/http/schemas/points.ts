@@ -26,6 +26,17 @@ export const PointSchema = z
   .openapi('ReviewPoint');
 export const PointResponse = z.object({ point: PointSchema }).openapi('PointResponse');
 export const LinkSharedBody = z.object({ pointIds: z.array(z.string().min(3).max(64)).min(2).max(50) }).openapi('LinkSharedBody');
+export const CommonPointBody = z
+  .object({
+    engagementIds: z.array(z.string().min(1).max(64)).min(2).max(50),
+    content: z.object({
+      title: z.string().min(1).max(500),
+      basis: z.string().max(5000).optional(),
+      area: z.string().max(100).optional(),
+      pri: z.enum(['High', 'Medium', 'Low']).optional()
+    })
+  })
+  .openapi('CommonPointBody');
 export const SharePointBody = z.object({ engagementIds: z.array(z.string().min(1).max(64)).min(1).max(50) }).openapi('SharePointBody');
 export const SharedPointResponse = z.object({ sharedGroupId: z.string(), points: z.array(PointSchema) }).openapi('SharedPointResponse');
 

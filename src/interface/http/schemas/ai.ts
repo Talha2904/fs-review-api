@@ -18,7 +18,9 @@ export const AiSettingsSchema = z
       .object({ by: z.object({ id: z.string(), name: z.string() }), at: z.string(), text: z.string().optional() })
       .nullable(),
     steps: AiStepsSchema,
-    model: z.string()
+    model: z.string(),
+    // optional for clients that do not know it yet: missing means on
+    standards: z.boolean().optional()
   })
   .openapi('AiSettings');
 export const KeyStatusSchema = z.object({ configured: z.boolean(), last4: z.string() }).openapi('KeyStatus');

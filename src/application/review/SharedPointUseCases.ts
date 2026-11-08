@@ -8,7 +8,8 @@ import { isLockedSignoff, type PermissionMatrix } from '@fs-review/shared';
 import { AppError, notFound, validationFailed } from '../../domain/errors.js';
 import type { Actor } from '../../domain/identity/User.js';
 import type { Person } from '../../domain/review/Document.js';
-import { nextRef, type PointContent, type PointMessage, type ReviewPoint } from '../../domain/review/Point.js';
+import { nextRef, typeFor, type PointContent, type PointMessage, type ReviewPoint } from '../../domain/review/Point.js';
+import { requirePermission } from '../identity/authorize.js';
 import type { Clock } from '../ports/Clock.js';
 import type { EngagementRepository } from '../ports/EngagementRepository.js';
 import type { EntityRepository } from '../ports/EntityRepository.js';
@@ -214,6 +215,77 @@ export class SharePoint extends SharedBase {
     const all = [...members.filter((m) => m.id !== p.id), source, ...created];
     await this.changed(all.map((x) => x.engagementId));
     return { sharedGroupId, points: all };
+  }
+}
+
+const PRIORITIES = ['High', 'Medium', 'Low'];
+
+/**
+ * A common review point: one new matter raised in several related funds at once (from the Portfolio or the
+ * Consolidated Review). Each fund gets its own copy (SP-n) to respond to and clear; the copies share one thread.
+ */
+export class RaiseCommonPoint extends SharedBase {
+  async execute(
+    actor: Actor | null,
+    matrix: PermissionMatrix,
+    engagementIds: string[],
+    input: { title?: unknown; basis?: unknown; pri?: unknown; area?: unknown }
+  ): Promise<{ sharedGroupId: string; points: ReviewPoint[] }> {
+    requirePermission(actor, 'points.raise', matrix); // a role that cannot raise points is told so first
+    const funds = [...new Set(engagementIds)];
+    if (funds.length < 2) throw validationFailed('Choose at least two funds for a common review point.');
+    const title = String(input.title ?? '').trim();
+    if (!title) throw validationFailed('Give the point a title.');
+    const group = await this.groupOf(funds[0]!);
+    if (funds.some((id) => !group.funds.some((f) => f.engagementId === id)))
+      throw validationFailed('A common review point can be raised only in funds of one group.');
+    const by = who(await this.writers(actor, matrix, group, funds));
+    const content: PointContent = { title };
+    const basis = String(input.basis ?? '').trim();
+    if (basis) content.basis = basis;
+    const area = String(input.area ?? '').trim();
+    if (area) content.area = area;
+    content.pri = PRIORITIES.includes(String(input.pri)) ? String(input.pri) : 'Medium';
+    const sharedGroupId = this.ids.next();
+    const now = this.clock.nowIso();
+    const created: ReviewPoint[] = [];
+    for (const engagementId of funds) {
+      const ref = nextRef(
+        'SP-',
+        (await this.points.listByEngagement(engagementId)).map((x) => x.ref)
+      );
+      created.push({
+        id: this.ids.next(),
+        engagementId,
+        ref,
+        source: 'manual',
+        content: { ...content, ref },
+        status: 'open',
+        type: typeFor(content),
+        dueDate: null,
+        assignedTo: null,
+        raisedBy: by,
+        raisedAt: now,
+        clearedBy: null,
+        clearedAt: null,
+        updatedAt: now,
+        sharedGroupId
+      });
+    }
+    const messages = created.map((p) =>
+      this.msg(
+        p,
+        'raise',
+        by,
+        `Raised by ${by.name} as a common review point, also in ${created
+          .filter((x) => x.id !== p.id)
+          .map((x) => label(group, x))
+          .join(', ')}. Each fund clears its own copy.`
+      )
+    );
+    await this.points.saveShared({ create: created, update: [], messages });
+    await this.changed(funds);
+    return { sharedGroupId, points: created };
   }
 }
 

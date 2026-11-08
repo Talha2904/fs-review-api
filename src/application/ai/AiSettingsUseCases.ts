@@ -58,11 +58,13 @@ export class SaveAiSettings {
     const src = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
     if (src.enabled && !src.acknowledgement) throw validationFailed('Confirm the firm’s AI policy before turning AI on.');
     const before = await this.load.execute();
-    const after = normalizeAi(src);
+    // a client that does not send the standards switch (an older page) leaves it as it was, never turns it back on
+    const after = normalizeAi('standards' in src ? src : { ...src, standards: before.standards });
     await this.repo.save(after, by.id, this.clock.nowIso());
     const changes = [
       before.enabled !== after.enabled && `AI ${after.enabled ? 'turned on' : 'turned off'}`,
       before.model !== after.model && `model ${after.model}`,
+      before.standards !== after.standards && `FRS 102 / IFRS standards ${after.standards ? 'on' : 'off'}`,
       ...AI_STEPS.filter((s) => before.steps[s.id] !== after.steps[s.id]).map((s) => `${s.label} ${after.steps[s.id] ? 'on' : 'off'}`)
     ].filter((x): x is string => typeof x === 'string');
     if (changes.length)

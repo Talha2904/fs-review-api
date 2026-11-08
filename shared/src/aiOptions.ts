@@ -53,13 +53,16 @@ export interface AiSettings {
   acknowledgement: AiAcknowledgement | null;
   steps: Record<AiStep, boolean>;
   model: ModelId;
+  /** the narrative review is given and cites the relevant FRS 102 / IFRS paragraphs (on unless turned off) */
+  standards: boolean;
 }
 
 export const DEFAULT_AI: AiSettings = {
   enabled: false,
   acknowledgement: null,
   steps: { extract: true, narrative: true, explain: true, version: true, consolidated: true },
-  model: 'claude-sonnet-5-5'
+  model: 'claude-sonnet-5-5',
+  standards: true
 };
 
 const isModel = (m: unknown): m is ModelId => MODELS.some((x) => x.id === m);
@@ -70,7 +73,13 @@ export function normalizeAi(s: unknown): AiSettings {
   const stepsIn = (src.steps && typeof src.steps === 'object' ? src.steps : {}) as Record<string, unknown>;
   const steps = Object.fromEntries(AI_STEPS.map((x) => [x.id, stepsIn[x.id] !== false])) as Record<AiStep, boolean>;
   const ack = src.acknowledgement && typeof src.acknowledgement === 'object' ? (src.acknowledgement as AiAcknowledgement) : null;
-  return { enabled: !!src.enabled && !!ack, acknowledgement: ack, steps, model: isModel(src.model) ? src.model : DEFAULT_AI.model };
+  return {
+    enabled: !!src.enabled && !!ack,
+    acknowledgement: ack,
+    steps,
+    model: isModel(src.model) ? src.model : DEFAULT_AI.model,
+    standards: src.standards !== false
+  };
 }
 
 export const stepLabel = (id: string): string => AI_STEPS.find((s) => s.id === id)?.label || id;

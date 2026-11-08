@@ -106,7 +106,7 @@ export class PrismaPointRepository implements PointRepository {
     } catch (e) {
       // the same reference, or a second copy for one fund (unique shared_group_id + engagement_id)
       if ((e as { code?: string }).code === 'P2002')
-        throw conflict('These points were shared by someone else at the same moment. Reload and try again.');
+        throw conflict('Someone else changed these points at the same moment. Reload and try again.');
       throw e;
     }
   }

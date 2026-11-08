@@ -37,6 +37,8 @@ COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 COPY --from=prune /app/shared/package.json shared/
 COPY --from=prune /app/shared/dist shared/dist
 COPY --from=prune /app/dist dist
+# the FRS 102 and IFRS passages the AI review cites (scripts/build-standards.ts); not under data/, a volume
+COPY standards standards
 # uploaded files (when no S3 settings are given) and the OCR cache; mount a volume here
 RUN mkdir -p data/files data/ocr-cache && chown -R node:node data
 USER node

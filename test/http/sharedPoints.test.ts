@@ -199,4 +199,47 @@ describe('Shared review points', () => {
     expect(funds.find((f: { engagementId: string }) => f.engagementId === eng2.id).locked).toBe(true);
     expect(funds.find((f: { engagementId: string }) => f.engagementId === x.eng.id).locked).toBe(false);
   });
+
+  it('raises a common review point in several funds at once: an SP copy in each, linked, each cleared on its own', async () => {
+    const x = await world();
+    const { eng2, other } = await related(x);
+    const body = {
+      engagementIds: [x.eng.id, eng2.id],
+      content: { title: 'Board minutes not on file', basis: 'Needed for both funds', pri: 'High' }
+    };
+    expect((await request(x.w.app).post('/api/points/common').set('Cookie', x.preparer).send(body)).status).toBe(403);
+    expect(
+      (
+        await request(x.w.app)
+          .post('/api/points/common')
+          .set('Cookie', x.reviewer)
+          .send({ ...body, engagementIds: [x.eng.id, other.id] })
+      ).status
+    ).toBe(400); // a different year end is another group
+    const r = await request(x.w.app).post('/api/points/common').set('Cookie', x.reviewer).send(body);
+    expect(r.status).toBe(200);
+    expect(r.body.points).toHaveLength(2);
+    for (const p of r.body.points)
+      expect(p).toMatchObject({
+        ref: 'SP-1',
+        status: 'open',
+        sharedGroupId: r.body.sharedGroupId,
+        content: { title: 'Board minutes not on file', pri: 'High' }
+      });
+    const s1 = await snapshot(x, x.eng.id);
+    expect(s1.messages.find((m: { kind: string }) => m.kind === 'raise').text).toMatch(/common review point, also in ABC Lending SP-1/);
+    expect(s1.shared.points).toHaveLength(1);
+    // a signed-off fund is refused and nothing is raised anywhere
+    x.w.signoffs.rows.set(eng2.id, {
+      engagementId: eng2.id,
+      state: 'signed',
+      by: null,
+      at: null,
+      text: '',
+      summary: null,
+      history: []
+    } as never);
+    expect((await request(x.w.app).post('/api/points/common').set('Cookie', x.reviewer).send(body)).status).toBe(400);
+    expect((await x.w.points.listByEngagement(x.eng.id)).filter((q) => q.ref.startsWith('SP-'))).toHaveLength(1);
+  });
 });

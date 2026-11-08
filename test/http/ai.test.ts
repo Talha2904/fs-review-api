@@ -1,13 +1,15 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 
+import type { StandardsLibrary } from '../../src/application/ports/StandardsLibrary.js';
 import { actorOf } from '../../src/domain/identity/User.js';
+import { FileStandardsLibrary } from '../../src/infrastructure/standards/FileStandardsLibrary.js';
 import { buildTestWorld, cookieOf, type TestWorld } from '../helpers/fakes.js';
 
 const PW = 'longenough1';
 const PDF = Buffer.from('%PDF-1.4 test').toString('base64'); // starts with JVBERi0
 
-async function world(opts: { aiConfigured?: boolean } = {}) {
+async function world(opts: { aiConfigured?: boolean; standards?: StandardsLibrary } = {}) {
   const w = buildTestWorld(opts);
   const admin = cookieOf(
     await request(w.app).post('/api/auth/setup').send({ name: 'Hamza Mehmood', username: 'hamza.mehmood', password: PW })
@@ -153,6 +155,63 @@ describe('Claude steps (RunAiStep, run by the analysis job)', () => {
     expect(text).toContain('1000000 in amount');
     expect(text).toContain('<rule id="CHK-15"');
     expect(w.ai.calls[0]!.system).toContain('Amounts are in EUR');
+    expect(text).not.toContain('standards_extracts'); // no standards library, no framework: the review is as before
+  });
+
+  it('narrative review sends the passages of the fund’s framework most relevant to the draft, and asks for their references', async () => {
+    const { w, admin } = await world({ standards: new FileStandardsLibrary() });
+    await turnOn(w, admin);
+    w.ai.answer = { points: [] };
+    const cy = {
+      blocks: [
+        { k: 'head', title: 'Note 12 — Related party transactions' },
+        {
+          k: 'para',
+          text: 'The fund paid management fees to the manager, a related party. Key management personnel received no compensation.'
+        },
+        { k: 'head', title: 'Note 14 — Events after the reporting period' }
+      ]
+    };
+    const run = async (framework: string | null) =>
+      w.uc.runAiStep.execute(
+        await as(w, 'rahat.kalim'),
+        w.permissions.matrix,
+        { step: 'narrative', docs: { cy, py: {}, is: {} }, threshold: 1000 },
+        { ...ctx, framework }
+      );
+    const sent = (i: number) => w.ai.calls[i]!.content.map((b) => ('text' in b ? b.text : '')).join('\n');
+    await run('FRS 102');
+    const text = sent(0);
+    expect(text).toContain('<standards_extracts framework="FRS 102">');
+    expect(text).toMatch(/\[FRS 102 33\.\d+[A-Z]?\]/); // related party disclosures
+    expect(text).toMatch(/\[FRS 102 32\.\d+[A-Z]?\]/); // events after the end of the reporting period
+    expect(text).toContain('cite the passage’s reference in refs');
+    const block = /<standards_extracts[\s\S]*?<\/standards_extracts>/.exec(text)![0];
+    expect(block.length).toBeLessThan(26000); // a few thousand tokens, never whole standards
+    expect(w.log.entries.some((e) => /standards paragraphs/.test(e.details ?? ''))).toBe(true);
+    await run('IFRS');
+    expect(sent(1)).toMatch(/\[IAS 24 \d+[A-Z]?\]/);
+    await run('US GAAP'); // no US GAAP standards were supplied
+    expect(sent(2)).not.toContain('standards_extracts');
+
+    // an Administrator can turn the standards off under AI Settings: logged, and no paragraphs are sent
+    const off = await request(w.app)
+      .put('/api/ai/settings')
+      .set('Cookie', admin)
+      .send({
+        settings: { enabled: true, acknowledgement: { by: { id: 'a', name: 'Hamza' }, at: '2026-10-28T10:00:00Z' }, standards: false }
+      });
+    expect(off.body.settings.standards).toBe(false);
+    expect(w.log.entries.some((e) => /FRS 102 \/ IFRS standards off/.test(e.details ?? ''))).toBe(true);
+    await run('FRS 102');
+    expect(sent(3)).not.toContain('standards_extracts');
+
+    // a page that does not send the switch (an older one) leaves it off, never turns it back on
+    const again = await request(w.app)
+      .put('/api/ai/settings')
+      .set('Cookie', admin)
+      .send({ settings: { enabled: true, acknowledgement: { by: { id: 'a', name: 'Hamza' }, at: '2026-10-28T10:00:00Z' } } });
+    expect(again.body.settings.standards).toBe(false);
   });
 });
 

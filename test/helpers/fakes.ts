@@ -94,6 +94,7 @@ import type { DocumentReading, ReadingRepository } from '../../src/application/p
 import type { ReportRepository, ReviewReport } from '../../src/application/ports/ReportRepository.js';
 import type { Session, SessionRepository } from '../../src/application/ports/SessionRepository.js';
 import type { Signoff, SignoffRepository } from '../../src/application/ports/SignoffRepository.js';
+import type { StandardsLibrary } from '../../src/application/ports/StandardsLibrary.js';
 import type { Tokens } from '../../src/application/ports/Tokens.js';
 import type { UserRepository } from '../../src/application/ports/UserRepository.js';
 import type { Workflow, WorkflowRepository } from '../../src/application/ports/WorkflowRepository.js';
@@ -129,7 +130,7 @@ import {
 } from '../../src/application/review/PointUseCases.js';
 import { GetNotifications, GetPortfolio } from '../../src/application/review/PortfolioUseCases.js';
 import { buildSnapshot, GetReviewSnapshot, ListReviewSnapshots } from '../../src/application/review/ReviewSnapshot.js';
-import { LinkSharedPoints, SharePoint, UnsharePoint } from '../../src/application/review/SharedPointUseCases.js';
+import { LinkSharedPoints, RaiseCommonPoint, SharePoint, UnsharePoint } from '../../src/application/review/SharedPointUseCases.js';
 import { AddReport, DownloadReport, SetSignoff } from '../../src/application/review/SignoffUseCases.js';
 import { SetWorkflowState } from '../../src/application/review/WorkflowUseCases.js';
 import { ReviewAccess } from '../../src/application/review/access.js';
@@ -887,7 +888,7 @@ export interface TestWorld {
   reports: MemoryReports;
 }
 
-export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: boolean } = {}): TestWorld {
+export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: boolean; standards?: StandardsLibrary } = {}): TestWorld {
   const clock = new FakeClock();
   const ids = new SeqIds();
   const tokens = new FakeTokens();
@@ -934,7 +935,7 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
   const startSession = new StartSession(sessions, tokens, ids, clock);
   const loadAi = new LoadAiSettings(aiSettings, 'claude-sonnet-5-5');
   const billingActions = new BillingActions(billing, log, clock, ids, activity);
-  const runAiStep = new RunAiStep(loadAi, ai, activity);
+  const runAiStep = new RunAiStep(loadAi, ai, activity, opts.standards);
   const saveAnalysisRun = new SaveAnalysisRun(access, runs, documents, workflows, ids, clock, events);
   const syncAnalysisPoints = new SyncAnalysisPoints(access, points, messages, ids, clock, events);
   const contexts = new AnalysisContextLoader(engagements, entities, checkRuleConfig, documents, workflows, runs, loadAi, ai, points);
@@ -1052,6 +1053,7 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     linkSharedPoints: new LinkSharedPoints(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     sharePoint: new SharePoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     unsharePoint: new UnsharePoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
+    raiseCommonPoint: new RaiseCommonPoint(access, points, messages, engagements, entities, ids, clock, events, signoffs),
     addEvidence: new AddEvidence(access, points, evidence, storage, tokens, ids, clock),
     downloadEvidence: new DownloadEvidence(access, evidence, storage),
     answerChecklistItem: new AnswerChecklistItem(access, answers, clock, events),
