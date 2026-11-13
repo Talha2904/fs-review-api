@@ -5,17 +5,29 @@ import type { Actor } from '../../domain/identity/User.js';
 import { ENTITY_DEFAULTS, entityNameKey, entityProblem, type EntityDocument } from '../../domain/review/Entity.js';
 import { requirePermission } from '../identity/authorize.js';
 import type { Clock } from '../ports/Clock.js';
+import type { EngagementRepository } from '../ports/EngagementRepository.js';
 import type { EntityRepository } from '../ports/EntityRepository.js';
 import type { IdGenerator } from '../ports/IdGenerator.js';
 
 const ID_RE = /^[A-Za-z0-9._-]{3,64}$/;
 
-/** Every staff member sees the client list; Finance sees it too for invoices. */
+/** Entities whose funds have all been deleted: hidden until one of their funds is restored. */
+export async function hiddenEntityIds(engagements: EngagementRepository): Promise<Set<string>> {
+  const [live, deleted] = await Promise.all([engagements.list(), engagements.listDeleted()]);
+  const withLive = new Set(live.map((r) => r.doc.entityId).filter(Boolean));
+  return new Set(deleted.map((r) => r.doc.entityId).filter((id): id is string => !!id && !withLive.has(id)));
+}
+
+/** Every staff member sees the client list; Finance sees it too for invoices. An entity left with only deleted funds is hidden. */
 export class ListEntities {
-  constructor(private readonly entities: EntityRepository) {}
+  constructor(
+    private readonly entities: EntityRepository,
+    private readonly engagements: EngagementRepository
+  ) {}
   async execute(actor: Actor | null, matrix: PermissionMatrix): Promise<EntityDocument[]> {
     requirePermission(actor, 'activity.write', matrix);
-    return (await this.entities.list()).map((r) => r.doc);
+    const [all, hidden] = await Promise.all([this.entities.list(), hiddenEntityIds(this.engagements)]);
+    return all.map((r) => r.doc).filter((d) => !hidden.has(d.id));
   }
 }
 
@@ -27,7 +39,8 @@ export class SaveEntity {
   constructor(
     private readonly entities: EntityRepository,
     private readonly ids: IdGenerator,
-    private readonly clock: Clock
+    private readonly clock: Clock,
+    private readonly engagements: EngagementRepository
   ) {}
 
   async execute(
@@ -50,7 +63,13 @@ export class SaveEntity {
     const problem = entityProblem(doc);
     if (problem) throw validationFailed(problem);
     const clash = await this.entities.findByNameKey(entityNameKey(doc.name));
-    if (clash && clash.doc.id !== id) throw conflict(`An entity called “${clash.doc.name}” already exists.`);
+    if (clash && clash.doc.id !== id) {
+      if ((await hiddenEntityIds(this.engagements)).has(clash.doc.id))
+        throw conflict(
+          `An entity called “${clash.doc.name}” already exists, with only deleted funds. Restore one of its funds from Deleted funds to use it again.`
+        );
+      throw conflict(`An entity called “${clash.doc.name}” already exists.`);
+    }
     const now = this.clock.nowIso();
     if (existing) {
       const updated = {

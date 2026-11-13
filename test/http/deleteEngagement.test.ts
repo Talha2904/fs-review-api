@@ -95,8 +95,8 @@ describe('deleting and restoring a fund', { timeout: 30_000 }, () => {
       actions: [],
       actionCount: 0
     });
-    // the entity stays when its last fund is deleted
-    expect(ids((await request(x.w.app).get('/api/entities').set('Cookie', x.reviewer)).body.entities)).toEqual([x.ent.id]);
+    // the entity is hidden when its last fund is deleted
+    expect(ids((await request(x.w.app).get('/api/entities').set('Cookie', x.reviewer)).body.entities)).toEqual([]);
 
     // every read and write by id answers 404
     const id = x.eng.id;
@@ -178,6 +178,41 @@ describe('deleting and restoring a fund', { timeout: 30_000 }, () => {
     }[];
     expect(after.some((e) => e.summary === 'Restored fund ABC Fund')).toBe(true);
     expect(after.some((e) => e.fundDeleted)).toBe(false);
+  });
+
+  it('hides an entity left with only deleted funds, and shows it again when one is restored', async () => {
+    const x = await world();
+    const names = async () =>
+      ((await request(x.w.app).get('/api/entities').set('Cookie', x.reviewer)).body.entities as { name: string }[]).map((e) => e.name);
+    const { ent2, eng2, eng3 } = await related(x);
+    const empty = await request(x.w.app)
+      .post('/api/entities')
+      .set('Cookie', x.manager)
+      .send({ name: 'New Client LP', framework: 'FRS 102' });
+    expect(empty.status).toBe(200);
+    expect(await names()).toEqual(expect.arrayContaining(['ABC Funds ICAV', 'ABC Lending LP', 'New Client LP']));
+
+    expect((await del(x, x.eng.id, x.admin)).status).toBe(200);
+    expect(await names()).not.toContain('ABC Funds ICAV');
+    // one of two funds deleted: the entity still shows
+    expect((await del(x, eng2.id, x.admin, { confirmName: 'ABC Lending' })).status).toBe(200);
+    expect(await names()).toContain('ABC Lending LP');
+    expect((await del(x, eng3.id, x.admin, { confirmName: 'ABC Lending II' })).status).toBe(200);
+    expect(await names()).not.toContain('ABC Lending LP');
+    // an entity that never had a fund still shows
+    expect(await names()).toContain('New Client LP');
+
+    // its name stays taken, with a hint
+    const clash = await request(x.w.app)
+      .post('/api/entities')
+      .set('Cookie', x.manager)
+      .send({ name: 'abc funds icav', framework: 'FRS 102' });
+    expect(clash.status).toBe(409);
+    expect(clash.body.error.message).toContain('Restore one of its funds');
+
+    expect((await restore(x, x.eng.id, x.admin)).status).toBe(200);
+    expect(await names()).toContain('ABC Funds ICAV');
+    expect(ent2.id).toBeTruthy();
   });
 
   it('refuses a restore when a live fund now has the same entity, name and year end', async () => {
