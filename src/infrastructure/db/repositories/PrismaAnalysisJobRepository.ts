@@ -4,6 +4,7 @@ import type {
   AnalysisJobStatus,
   AnalysisMode
 } from '../../../application/ports/AnalysisJobRepository.js';
+import { notFound } from '../../../domain/errors.js';
 import type { Person } from '../../../domain/review/Document.js';
 import type { Db } from '../prisma.js';
 
@@ -58,6 +59,8 @@ export class PrismaAnalysisJobRepository implements AnalysisJobRepository {
           async (tx) => {
             const busy = await tx.analysisJob.count({ where: { engagementId: job.engagementId, status: { in: ['queued', 'running'] } } });
             if (busy) return false;
+            // read in the same serializable transaction as a delete of the fund (PrismaEngagementRepository.markDeleted)
+            if (!(await tx.engagement.count({ where: { id: job.engagementId, deletedAt: null } }))) throw notFound('That engagement');
             await tx.analysisJob.create({ data: { id: job.id, ...data(job) } });
             return true;
           },
@@ -95,7 +98,11 @@ export class PrismaAnalysisJobRepository implements AnalysisJobRepository {
   }
 
   async listByStatus(statuses: AnalysisJobStatus[]): Promise<AnalysisJob[]> {
-    const rows = await this.db.analysisJob.findMany({ where: { status: { in: statuses } }, orderBy: { createdAt: 'asc' } });
+    // never picks up a deleted fund's job (deleting is refused while one is active, so this is a safeguard)
+    const rows = await this.db.analysisJob.findMany({
+      where: { status: { in: statuses }, engagement: { deletedAt: null } },
+      orderBy: { createdAt: 'asc' }
+    });
     return rows.map(toDomain);
   }
 }

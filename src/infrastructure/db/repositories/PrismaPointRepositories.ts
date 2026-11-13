@@ -112,9 +112,12 @@ export class PrismaPointRepository implements PointRepository {
   }
   async listBySharedGroups(groupIds: string[]): Promise<ReviewPoint[]> {
     if (!groupIds.length) return [];
-    return (await this.db.reviewPoint.findMany({ where: { sharedGroupId: { in: groupIds } }, orderBy: { raisedAt: 'asc' } })).map(
-      pointToDomain
-    );
+    // a deleted fund's copy is kept (it comes back on restore) but is no longer one of the shared point's funds
+    const rows = await this.db.reviewPoint.findMany({
+      where: { sharedGroupId: { in: groupIds }, engagement: { deletedAt: null } },
+      orderBy: { raisedAt: 'asc' }
+    });
+    return rows.map(pointToDomain);
   }
 }
 

@@ -26,6 +26,28 @@ export const EngagementResponse = z.object({ engagement: EngagementSchema }).ope
 
 export const IdParams = z.object({ id: z.string().min(3).max(64) });
 
+/** Deleting a fund: its name typed again to confirm, and an optional reason. */
+export const DeleteEngagementBody = z
+  .object({ confirmName: z.string().max(200), reason: z.string().max(500).nullable().optional() })
+  .openapi('DeleteEngagementBody');
+export const DeleteEngagementResponse = z.object({ id: z.string(), deletedAt: z.string() }).openapi('DeleteEngagementResponse');
+export const RestoreEngagementResponse = z.object({ id: z.string() }).openapi('RestoreEngagementResponse');
+const PersonSchema = z.object({ id: z.string(), name: z.string(), role: z.string() });
+export const DeletedFundSchema = z
+  .object({
+    id: z.string(),
+    fundName: z.string(),
+    yearEnd: z.string(),
+    entityId: z.string().nullable(),
+    entityName: z.string(),
+    clientName: z.string(),
+    deletedAt: z.string(),
+    deletedBy: PersonSchema.nullable(),
+    reason: z.string().nullable()
+  })
+  .openapi('DeletedFund');
+export const DeletedFundsResponse = z.object({ funds: z.array(DeletedFundSchema) }).openapi('DeletedFundsResponse');
+
 export const CheckRuleConfigSchema = z
   .object({
     rules: z.record(z.string(), z.unknown()),

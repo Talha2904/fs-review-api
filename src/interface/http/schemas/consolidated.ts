@@ -63,7 +63,9 @@ export const ConsolidatedReviewResponse = z
         finishedAt: z.string().nullable(),
         requestedBy: Person,
         // links, unmatched lines, common point groups, summary and how AI was used (see shared consolidation.ts)
-        result: z.record(z.unknown()).nullable()
+        result: z.record(z.unknown()).nullable(),
+        /** the review read a fund that has since been deleted: its result is not returned until it is run again */
+        withheld: z.literal('deletedFund').optional()
       })
       .nullable(),
     stale: z.object({ changed: z.array(z.string()), added: z.array(z.string()), removed: z.array(z.string()) }).nullable()

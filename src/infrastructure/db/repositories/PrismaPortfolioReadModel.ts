@@ -1,6 +1,9 @@
 import type { FundActivity, PortfolioReadModel } from '../../../application/ports/PortfolioReadModel.js';
 import type { Db } from '../prisma.js';
 
+/** Rows of funds that are not deleted (a deleted fund's review is kept but never counted). */
+const LIVE = { engagement: { deletedAt: null } };
+
 const later = (...xs: (Date | null | undefined)[]): Date | null => xs.reduce<Date | null>((a, x) => (x && (!a || x > a) ? x : a), null);
 
 /**
@@ -13,17 +16,20 @@ export class PrismaPortfolioReadModel implements PortfolioReadModel {
 
   async activity(today: string): Promise<FundActivity[]> {
     const [versions, workflows, signoffs, byStatus, overdue, runs, messages] = await Promise.all([
-      this.db.documentVersion.findMany({ select: { engagementId: true, slot: true, version: true, removedAt: true, uploadedAt: true } }),
-      this.db.workflow.findMany({ select: { engagementId: true, state: true, at: true } }),
-      this.db.signoff.findMany({ select: { engagementId: true, state: true, at: true } }),
-      this.db.reviewPoint.groupBy({ by: ['engagementId', 'status'], _count: { _all: true } }),
+      this.db.documentVersion.findMany({
+        where: LIVE,
+        select: { engagementId: true, slot: true, version: true, removedAt: true, uploadedAt: true }
+      }),
+      this.db.workflow.findMany({ where: LIVE, select: { engagementId: true, state: true, at: true } }),
+      this.db.signoff.findMany({ where: LIVE, select: { engagementId: true, state: true, at: true } }),
+      this.db.reviewPoint.groupBy({ by: ['engagementId', 'status'], where: LIVE, _count: { _all: true } }),
       this.db.reviewPoint.groupBy({
         by: ['engagementId'],
-        where: { status: { in: ['open', 'reopened', 'responded'] }, dueDate: { not: null, lt: today } },
+        where: { ...LIVE, status: { in: ['open', 'reopened', 'responded'] }, dueDate: { not: null, lt: today } },
         _count: { _all: true }
       }),
-      this.db.analysisRun.groupBy({ by: ['engagementId'], _max: { at: true } }),
-      this.db.pointMessage.groupBy({ by: ['engagementId'], _max: { at: true } })
+      this.db.analysisRun.groupBy({ by: ['engagementId'], where: LIVE, _max: { at: true } }),
+      this.db.pointMessage.groupBy({ by: ['engagementId'], where: { point: LIVE }, _max: { at: true } })
     ]);
 
     const funds = new Map<string, FundActivity & { last: Date | null }>();

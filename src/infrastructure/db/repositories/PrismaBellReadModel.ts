@@ -8,6 +8,10 @@ import { currentVersions, type DocumentVersion } from '../../../domain/review/Do
 import type { Db } from '../prisma.js';
 
 type Who = { id: string; name: string; role?: string } | null;
+/** Rows of funds that are not deleted. Workflows, sign-offs and runs come from their repositories; the bell lists
+ * live funds only (GetNotifications), so a deleted fund's rows there are never shown. */
+const LIVE = { engagement: { deletedAt: null } };
+
 const who = (v: unknown): Who => (v as Who) ?? null;
 
 /** The bell's reads with column selects: six queries at once, whatever the number of funds. */
@@ -20,6 +24,7 @@ export class PrismaBellReadModel implements BellReadModel {
   async reviews(userId: string, messagesSince: string): Promise<Record<string, ReviewLike>> {
     const [versions, workflows, signoffs, points, recent, runs] = await Promise.all([
       this.db.documentVersion.findMany({
+        where: LIVE,
         select: {
           id: true,
           engagementId: true,
@@ -38,6 +43,7 @@ export class PrismaBellReadModel implements BellReadModel {
       this.s.workflows.listAll(),
       this.s.signoffs.listAll(),
       this.db.reviewPoint.findMany({
+        where: LIVE,
         select: {
           id: true,
           engagementId: true,
@@ -55,7 +61,7 @@ export class PrismaBellReadModel implements BellReadModel {
       }),
       // the window's messages in one query alongside the others; filtered to this person's points below
       this.db.pointMessage.findMany({
-        where: { at: { gte: new Date(messagesSince) } },
+        where: { at: { gte: new Date(messagesSince) }, point: LIVE },
         select: { id: true, pointId: true, engagementId: true, kind: true, author: true, at: true, text: true },
         orderBy: { at: 'asc' }
       }),

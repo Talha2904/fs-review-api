@@ -13,7 +13,7 @@ import {
 
 import type { UseCases } from '../../src/application/UseCases.js';
 import { ActivityRecorder } from '../../src/application/activity/ActivityRecorder.js';
-import { ListActivity } from '../../src/application/activity/ListActivity.js';
+import { ListActivity, RecordAppActivity } from '../../src/application/activity/ListActivity.js';
 import {
   GetAiSettings,
   GetAiStatus,
@@ -71,7 +71,7 @@ import type {
   ConsolidatedStatus
 } from '../../src/application/ports/ConsolidatedReviewRepository.js';
 import type { DocumentChanges, DocumentRepository } from '../../src/application/ports/DocumentRepository.js';
-import type { EngagementRecord, EngagementRepository } from '../../src/application/ports/EngagementRepository.js';
+import type { EngagementDeletion, EngagementRecord, EngagementRepository } from '../../src/application/ports/EngagementRepository.js';
 import type { EntityRecord, EntityRepository } from '../../src/application/ports/EntityRepository.js';
 import type { FileStorage, StoredFile } from '../../src/application/ports/FileStorage.js';
 import type { FxRate, FxRateSource } from '../../src/application/ports/FxRateSource.js';
@@ -108,6 +108,7 @@ import {
   RunConsolidatedReview,
   StartConsolidatedReview
 } from '../../src/application/review/ConsolidatedReviewUseCases.js';
+import { DeleteEngagement, ListDeletedEngagements, RestoreEngagement } from '../../src/application/review/DeleteEngagementUseCases.js';
 import {
   AttachDocument,
   AttachSampleDocument,
@@ -443,16 +444,24 @@ export class MemoryEntities implements EntityRepository {
 
 export class MemoryEngagements implements EngagementRepository {
   rows = new Map<string, EngagementRecord>();
+  /** deletions by fund id (a soft delete, as the Prisma repository's deleted_at columns) */
+  deletions = new Map<string, EngagementDeletion>();
+  isLive(id: string) {
+    return this.rows.has(id) && !this.deletions.has(id);
+  }
+  private live() {
+    return [...this.rows.values()].filter((r) => !this.deletions.has(r.doc.id));
+  }
   async list() {
-    return [...this.rows.values()];
+    return this.live();
   }
   async findById(id: string) {
-    return this.rows.get(id) ?? null;
+    return this.isLive(id) ? this.rows.get(id)! : null;
   }
   async findDuplicate(entityId: string | null, fundName: string, yearEnd: string, exceptId: string | null) {
     const key = fundName.toLowerCase().replace(/\s+/g, '');
     return (
-      [...this.rows.values()].find(
+      this.live().find(
         (r) =>
           r.doc.id !== exceptId &&
           (r.doc.entityId || null) === entityId &&
@@ -465,7 +474,29 @@ export class MemoryEngagements implements EngagementRepository {
     this.rows.set(r.doc.id, r);
   }
   async update(r: EngagementRecord) {
+    if (!this.isLive(r.doc.id)) throw new AppError('NOT_FOUND', 'That engagement was not found.');
     this.rows.set(r.doc.id, r);
+  }
+  async findIncludingDeleted(id: string) {
+    const r = this.rows.get(id);
+    return r ? { ...r, deleted: this.deletions.get(id) ?? null } : null;
+  }
+  async listDeleted() {
+    return [...this.deletions.entries()]
+      .sort((a, b) => b[1].at.localeCompare(a[1].at))
+      .map(([id, d]) => ({ ...this.rows.get(id)!, deleted: d }));
+  }
+  async markDeleted(id: string, d: EngagementDeletion) {
+    if (!this.isLive(id)) return false;
+    this.deletions.set(id, { ...d });
+    return true;
+  }
+  async restore(id: string, updatedBy: string, at: string) {
+    if (!this.deletions.has(id)) return false;
+    this.deletions.delete(id);
+    const r = this.rows.get(id)!;
+    this.rows.set(id, { ...r, updatedBy, updatedAt: at });
+    return true;
   }
 }
 
@@ -604,8 +635,10 @@ export class MemoryJobs implements AnalysisJobRepository {
     for (const r of this.rows) out.set(r.engagementId, r);
     return [...out.values()];
   }
+  /** the funds, to leave deleted funds' jobs out as the Prisma repository does (set when the world is built) */
+  engagements?: MemoryEngagements;
   async listByStatus(statuses: AnalysisJobStatus[]) {
-    return this.rows.filter((r) => statuses.includes(r.status));
+    return this.rows.filter((r) => statuses.includes(r.status) && this.engagements?.deletions.has(r.engagementId) !== true);
   }
 }
 
@@ -702,8 +735,12 @@ export class MemoryPoints implements PointRepository {
     this.rows = rows;
     this.messages?.rows.push(...change.messages);
   }
+  /** the funds, to leave deleted funds' copies out as the Prisma repository does (set when the world is built) */
+  engagements?: MemoryEngagements;
   async listBySharedGroups(groupIds: string[]) {
-    return [...this.rows.values()].filter((p) => p.sharedGroupId && groupIds.includes(p.sharedGroupId));
+    return [...this.rows.values()].filter(
+      (p) => p.sharedGroupId && groupIds.includes(p.sharedGroupId) && this.engagements?.deletions.has(p.engagementId) !== true
+    );
   }
 }
 
@@ -718,6 +755,7 @@ export class MemoryBellReadModel implements BellReadModel {
       points: MemoryPoints;
       runs: MemoryRuns;
       messages: MemoryMessages;
+      engagements: MemoryEngagements;
     }
   ) {}
   async reviews(userId: string, messagesSince: string) {
@@ -727,6 +765,7 @@ export class MemoryBellReadModel implements BellReadModel {
     for (const m of [this.s.workflows.rows, this.s.signoffs.rows]) for (const k of m.keys()) ids.add(k);
     for (const p of points) ids.add(p.engagementId);
     for (const r of this.s.runs.rows) ids.add(r.engagementId);
+    for (const id of this.s.engagements.deletions.keys()) ids.delete(id);
     return Object.fromEntries(
       [...ids].map((id) => [
         id,
@@ -759,6 +798,7 @@ export class MemoryPortfolioReadModel implements PortfolioReadModel {
       points: MemoryPoints;
       runs: MemoryRuns;
       messages: MemoryMessages;
+      engagements: MemoryEngagements;
     }
   ) {}
   async activity(today: string): Promise<FundActivity[]> {
@@ -766,6 +806,7 @@ export class MemoryPortfolioReadModel implements PortfolioReadModel {
     for (const m of [this.s.workflows.rows, this.s.signoffs.rows]) for (const k of m.keys()) ids.add(k);
     for (const p of this.s.points.rows.values()) ids.add(p.engagementId);
     for (const r of this.s.runs.rows) ids.add(r.engagementId);
+    for (const id of this.s.engagements.deletions.keys()) ids.delete(id);
     return [...ids].map((id) => {
       const versions = [...this.s.documents.rows.values()].filter((v) => v.engagementId === id);
       const points = [...this.s.points.rows.values()].filter((p) => p.engagementId === id);
@@ -920,15 +961,17 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
   const points = new MemoryPoints();
   const messages = new MemoryMessages();
   points.messages = messages;
+  points.engagements = engagements;
   const evidence = new MemoryEvidence();
   const answers = new MemoryAnswers();
   const reports = new MemoryReports();
   const jobs = new MemoryJobs();
+  jobs.engagements = engagements;
   const snapshotSources = { documents, workflows, signoffs, points, messages, checklists: answers, reports, runs, jobs };
   const reader = new PdfJsDocumentReader();
   const queue = new InProcessJobQueue(1, silentLogger);
   const ocr = new FakeOcr();
-  const listSnapshots = new ListReviewSnapshots(snapshotSources);
+  const listSnapshots = new ListReviewSnapshots(snapshotSources, engagements);
   const appUrl = 'http://localhost:5173';
 
   const activity = new ActivityRecorder(log, clock, ids);
@@ -976,6 +1019,7 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     logger: silentLogger
   });
   consolidatedQueue.handle((id) => runConsolidated.execute(id));
+  const deleteDeps = { engagements, entities, jobs, consolidated, activity, clock, events, points, signoffs, ids };
 
   const uc: UseCases = {
     resolveSession: new ResolveSession(sessions, users, tokens, clock),
@@ -992,14 +1036,15 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     requestPasswordReset: new RequestPasswordReset(users, resets, mailer, tokens, ids, clock, activity, silentLogger, appUrl),
     resetPassword: new ResetPassword(users, resets, sessions, hasher, tokens, clock, activity),
     activity,
-    listActivity: new ListActivity(log),
+    listActivity: new ListActivity(log, engagements),
+    recordAppActivity: new RecordAppActivity(activity, engagements),
     getAiStatus: new GetAiStatus(loadAi, ai),
     getAiSettings: new GetAiSettings(loadAi, ai),
     saveAiSettings: new SaveAiSettings(aiSettings, loadAi, ai, clock, activity),
     testAiConnection: new TestAiConnection(loadAi, ai, activity),
     runAiStep,
     readScannedPages: new ReadScannedPages(ocr, activity),
-    getBilling: new GetBilling(billingActions),
+    getBilling: new GetBilling(billingActions, engagements),
     applyBillingAction: new ApplyBillingAction(billingActions),
     getIntegrations: new GetIntegrations(mailer, xero, xeroConnections, false),
     emailInvoice: new EmailInvoice(billingActions, billing, mailer),
@@ -1011,6 +1056,9 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
     saveEntity: new SaveEntity(entities, ids, clock),
     listEngagements: new ListEngagements(engagements),
     saveEngagement: new SaveEngagement(engagements, entities, ids, clock, signoffs),
+    deleteEngagement: new DeleteEngagement(deleteDeps),
+    restoreEngagement: new RestoreEngagement(deleteDeps),
+    listDeletedEngagements: new ListDeletedEngagements(engagements, entities),
     getCheckRuleConfig: new GetCheckRuleConfig(checkRuleConfig),
     saveCheckRuleConfig: new SaveCheckRuleConfig(checkRuleConfig, clock),
     getChecklists: new GetChecklists(checklists),
@@ -1024,13 +1072,13 @@ export function buildTestWorld(opts: { mailConfigured?: boolean; aiConfigured?: 
       engagements,
       entities,
       users,
-      new MemoryPortfolioReadModel({ documents, workflows, signoffs, points, runs, messages }),
+      new MemoryPortfolioReadModel({ documents, workflows, signoffs, points, runs, messages, engagements }),
       clock
     ),
     getNotifications: new GetNotifications(
       engagements,
       entities,
-      new MemoryBellReadModel({ documents, workflows, signoffs, points, runs, messages }),
+      new MemoryBellReadModel({ documents, workflows, signoffs, points, runs, messages, engagements }),
       clock
     ),
     attachDocument: new AttachDocument(access, documents, points, storage, tokens, ids, clock, events),

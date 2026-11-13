@@ -10,7 +10,12 @@ export const BillingActionSchema = z
   .openapi('BillingAction');
 export const BillingBody = z.object({ action: BillingActionSchema }).openapi('BillingBody');
 export const BillingStateResponse = z
-  .object({ state: z.record(z.string(), z.unknown()), usage: z.array(z.unknown()).optional() })
+  .object({
+    state: z.record(z.string(), z.unknown()),
+    usage: z.array(z.unknown()).optional(),
+    /** ids of deleted funds: still billable, marked Deleted on the Finance screens */
+    deletedFunds: z.array(z.string()).optional()
+  })
   .openapi('BillingStateResponse');
 export const IntegrationsResponse = z
   .object({

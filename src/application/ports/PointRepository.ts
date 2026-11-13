@@ -10,7 +10,7 @@ export interface PointRepository {
   update(point: ReviewPoint, expectedUpdatedAt: string): Promise<void>;
   /** Records that the point's thread moved on (a comment), changing nothing else. */
   touch(id: string, at: string): Promise<void>;
-  /** Every fund's copy of these shared points. */
+  /** Every live fund's copy of these shared points (a deleted fund's copy is left out). */
   listBySharedGroups(groupIds: string[]): Promise<ReviewPoint[]>;
   /**
    * Sharing changes several funds' points at once, so it is saved all or nothing: the new copies, the points it

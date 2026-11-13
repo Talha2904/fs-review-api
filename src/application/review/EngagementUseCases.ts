@@ -1,6 +1,6 @@
 import { isLockedSignoff, type PermissionMatrix } from '@fs-review/shared';
 
-import { conflict, locked, validationFailed } from '../../domain/errors.js';
+import { conflict, locked, notFound, validationFailed } from '../../domain/errors.js';
 import type { Actor } from '../../domain/identity/User.js';
 import { engagementIndex, engagementProblem, type EngagementDocument } from '../../domain/review/Engagement.js';
 import { requireAnyPermission, requirePermission } from '../identity/authorize.js';
@@ -42,6 +42,8 @@ export class SaveEngagement {
     const id = idFromPath || (typeof input.id === 'string' ? input.id : '') || this.ids.next();
     if (!ID_RE.test(id)) throw validationFailed('The engagement id is not valid.');
     const existing = await this.engagements.findById(id);
+    // a deleted fund is not found, and its id is never taken by a new one (restore it instead)
+    if (!existing && (await this.engagements.findIncludingDeleted(id))) throw notFound('That engagement');
     // settings, team and trial balance mapping of a signed-off review cannot change until it is unlocked
     if (existing && isLockedSignoff((await this.signoffs.get(id))?.state ?? 'none')) throw locked();
     const doc: EngagementDocument = {

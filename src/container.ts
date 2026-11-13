@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import type { UseCases } from './application/UseCases.js';
 import { ActivityRecorder } from './application/activity/ActivityRecorder.js';
-import { ListActivity } from './application/activity/ListActivity.js';
+import { ListActivity, RecordAppActivity } from './application/activity/ListActivity.js';
 import { GetAiSettings, GetAiStatus, LoadAiSettings, SaveAiSettings, TestAiConnection } from './application/ai/AiSettingsUseCases.js';
 import { RunAiStep } from './application/ai/RunAiStep.js';
 import {
@@ -49,6 +49,7 @@ import {
   RunConsolidatedReview,
   StartConsolidatedReview
 } from './application/review/ConsolidatedReviewUseCases.js';
+import { DeleteEngagement, ListDeletedEngagements, RestoreEngagement } from './application/review/DeleteEngagementUseCases.js';
 import {
   AttachDocument,
   AttachSampleDocument,
@@ -204,7 +205,7 @@ export function buildContainer(env: Env): Container {
   const jobs = new PrismaAnalysisJobRepository(db);
   const snapshotSources = { documents, workflows, signoffs, points, messages, checklists: answers, reports, runs, jobs };
   const reader = new IsolatedDocumentReader();
-  const listReviewSnapshots = new ListReviewSnapshots(snapshotSources); // untrusted documents are parsed in worker threads
+  const listReviewSnapshots = new ListReviewSnapshots(snapshotSources, engagements); // untrusted documents are parsed in worker threads
   const queue = new InProcessJobQueue(env.ANALYSIS_WORKERS, logger);
   const gateway = new AnthropicGateway(env.ANTHROPIC_API_KEY);
   const ocr = new TesseractEngine(path.resolve(apiRoot, env.OCR_CACHE_DIR));
@@ -268,6 +269,7 @@ export function buildContainer(env: Env): Container {
   // Consolidated Reviews have their own queue (one at a time) and their own table
   const consolidatedReviews = new PrismaConsolidatedReviewRepository(db);
   const consolidatedQueue = new InProcessJobQueue(1, logger);
+  const deleteDeps = { engagements, entities, jobs, consolidated: consolidatedReviews, activity, clock, events, points, signoffs, ids };
   const runConsolidated = new RunConsolidatedReview({
     reviews: consolidatedReviews,
     engagements,
@@ -302,14 +304,15 @@ export function buildContainer(env: Env): Container {
     requestPasswordReset: new RequestPasswordReset(users, resets, mailer, tokens, ids, clock, activity, logger, env.APP_URL),
     resetPassword: new ResetPassword(users, resets, sessions, hasher, tokens, clock, activity),
     activity,
-    listActivity: new ListActivity(log),
+    listActivity: new ListActivity(log, engagements),
+    recordAppActivity: new RecordAppActivity(activity, engagements),
     getAiStatus: new GetAiStatus(loadAi, gateway),
     getAiSettings: new GetAiSettings(loadAi, gateway),
     saveAiSettings: new SaveAiSettings(aiSettings, loadAi, gateway, clock, activity),
     testAiConnection: new TestAiConnection(loadAi, gateway, activity),
     runAiStep,
     readScannedPages: new ReadScannedPages(ocr, activity),
-    getBilling: new GetBilling(billingActions),
+    getBilling: new GetBilling(billingActions, engagements),
     applyBillingAction: new ApplyBillingAction(billingActions),
     getIntegrations: new GetIntegrations(mailer, xero, xeroConnections, env.BILLING_FX_AUTO),
     emailInvoice: new EmailInvoice(billingActions, billing, mailer),
@@ -321,6 +324,9 @@ export function buildContainer(env: Env): Container {
     saveEntity: new SaveEntity(entities, ids, clock),
     listEngagements: new ListEngagements(engagements),
     saveEngagement: new SaveEngagement(engagements, entities, ids, clock, signoffs),
+    deleteEngagement: new DeleteEngagement(deleteDeps),
+    restoreEngagement: new RestoreEngagement(deleteDeps),
+    listDeletedEngagements: new ListDeletedEngagements(engagements, entities),
     getCheckRuleConfig: new GetCheckRuleConfig(checkRuleConfig),
     saveCheckRuleConfig: new SaveCheckRuleConfig(checkRuleConfig, clock),
     getChecklists: new GetChecklists(checklists),

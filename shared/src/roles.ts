@@ -10,6 +10,12 @@ export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export const EDITABLE_PERMS = [
   { id: 'engagements.edit', label: 'Add and edit engagements', verb: 'sets up engagements' },
+  {
+    id: 'engagements.delete',
+    label: 'Delete and restore funds (Administrators always can)',
+    verb: 'deletes and restores funds',
+    noPreparer: true
+  },
   { id: 'documents.attach', label: 'Attach documents', verb: 'attaches documents' },
   { id: 'analysis.run', label: 'Run the analysis and version pass', verb: 'runs the analysis' },
   { id: 'points.raise', label: 'Raise review points and assign them', verb: 'raises review points' },
@@ -34,6 +40,8 @@ export type PermissionMatrix = Record<EditablePermission, StaffRole[]>;
 
 export const DEFAULT_MATRIX: PermissionMatrix = {
   'engagements.edit': ['Manager'],
+  // Administrators only, unless an Administrator grants it
+  'engagements.delete': [],
   'documents.attach': ['Manager', 'Reviewer', 'Preparer'],
   'analysis.run': ['Manager', 'Reviewer'],
   'points.raise': ['Partner', 'Manager', 'Reviewer'],

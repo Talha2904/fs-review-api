@@ -5,6 +5,7 @@ import type { Actor } from '../../domain/identity/User.js';
 import { requirePermission } from '../identity/authorize.js';
 import { invoiceEmail } from '../mail/emailLayout.js';
 import type { BillingRepository } from '../ports/BillingRepository.js';
+import type { EngagementRepository } from '../ports/EngagementRepository.js';
 import type { FxRateSource } from '../ports/FxRateSource.js';
 import type { Mailer } from '../ports/Mailer.js';
 import type { XeroClient } from '../ports/XeroClient.js';
@@ -12,12 +13,19 @@ import type { XeroConnectionRepository } from '../ports/XeroConnectionRepository
 
 import type { BillingActions } from './BillingActions.js';
 
-/** Finance reads the whole billing state plus the AI usage it can bill. */
+/**
+ * Finance reads the whole billing state plus the AI usage it can bill. A deleted fund stays fully billable (its AI
+ * usage was really spent, and invoices are never changed by a delete); `deletedFunds` lets Finance mark it.
+ */
 export class GetBilling {
-  constructor(private readonly actions: BillingActions) {}
+  constructor(
+    private readonly actions: BillingActions,
+    private readonly engagements: EngagementRepository
+  ) {}
   async execute(actor: Actor | null, matrix: PermissionMatrix) {
     requirePermission(actor, 'billing.manage', matrix);
-    return this.actions.state();
+    const [state, deleted] = await Promise.all([this.actions.state(), this.engagements.listDeleted()]);
+    return { ...state, deletedFunds: deleted.map((r) => r.doc.id) };
   }
 }
 

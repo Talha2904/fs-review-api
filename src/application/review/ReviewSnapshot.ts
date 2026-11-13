@@ -8,6 +8,7 @@ import type { AnalysisJob, AnalysisJobRepository } from '../ports/AnalysisJobRep
 import type { AnalysisRun, AnalysisRunRepository, AnalysisRunSummary } from '../ports/AnalysisRunRepository.js';
 import type { ChecklistAnswerRepository, DisclosureChecklist } from '../ports/ChecklistAnswerRepository.js';
 import type { DocumentRepository } from '../ports/DocumentRepository.js';
+import type { EngagementRepository } from '../ports/EngagementRepository.js';
 import type { PointMessageRepository, PointRepository } from '../ports/PointRepository.js';
 import type { ReportRepository, ReviewReport, ReviewReportView } from '../ports/ReportRepository.js';
 import { EMPTY_SIGNOFF, type Signoff, type SignoffRepository } from '../ports/SignoffRepository.js';
@@ -114,12 +115,16 @@ export class GetReviewSnapshot {
   }
 }
 
-/** Every fund's review at once, for the portfolio, the bell and the umbrella documents of sister funds. */
+/** Every live fund's review at once, for the portfolio, the bell and the umbrella documents of sister funds. */
 export class ListReviewSnapshots {
-  constructor(private readonly s: SnapshotSources) {}
+  constructor(
+    private readonly s: SnapshotSources,
+    private readonly engagements: EngagementRepository
+  ) {}
   async execute(actor: Actor | null, matrix: PermissionMatrix): Promise<Record<string, ReviewSnapshot>> {
     requirePermission(actor, 'reviews.read', matrix);
-    const [versions, workflows, signoffs, points, messages, checklists, reports, runs, jobs] = await Promise.all([
+    const [live, versions, workflows, signoffs, points, messages, checklists, reports, runs, jobs] = await Promise.all([
+      this.engagements.list(),
       this.s.documents.listAll(),
       this.s.workflows.listAll(),
       this.s.signoffs.listAll(),
@@ -130,14 +135,18 @@ export class ListReviewSnapshots {
       this.s.runs.latestAll(),
       this.s.jobs.latestAll()
     ]);
-    const ids = new Set<string>([
-      ...versions.map((v) => v.engagementId),
-      ...workflows.map((w) => w.engagementId),
-      ...signoffs.map((x) => x.engagementId),
-      ...points.map((x) => x.engagementId),
-      ...runs.map((x) => x.engagementId),
-      ...jobs.map((x) => x.engagementId)
-    ]);
+    // a deleted fund's review is kept but never listed
+    const liveIds = new Set(live.map((r) => r.doc.id));
+    const ids = new Set<string>(
+      [
+        ...versions.map((v) => v.engagementId),
+        ...workflows.map((w) => w.engagementId),
+        ...signoffs.map((x) => x.engagementId),
+        ...points.map((x) => x.engagementId),
+        ...runs.map((x) => x.engagementId),
+        ...jobs.map((x) => x.engagementId)
+      ].filter((id) => liveIds.has(id))
+    );
     // grouped once by fund, so the listing grows with the number of rows, not rows times funds
     const many = <T extends { engagementId: string }>(rows: T[]) => {
       const m = new Map<string, T[]>();

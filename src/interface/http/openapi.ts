@@ -83,6 +83,10 @@ import {
   CheckRuleConfigBody,
   CheckRuleConfigResponse,
   ChecklistBody,
+  DeletedFundsResponse,
+  DeleteEngagementBody,
+  DeleteEngagementResponse,
+  RestoreEngagementResponse,
   ChecklistResponse,
   ChecklistsResponse,
   EngagementBody,
@@ -429,6 +433,34 @@ export function buildOpenApi(version: string) {
     body: EngagementBody,
     ok: EngagementResponse,
     errs: [400, 401, 403, 409]
+  });
+  add({
+    method: 'get',
+    path: '/api/engagements/deleted',
+    tags: ['Engagements'],
+    summary: 'The deleted funds, most recently deleted first (engagements.delete: Administrators)',
+    ok: DeletedFundsResponse,
+    errs: [401, 403]
+  });
+  add({
+    method: 'delete',
+    path: '/api/engagements/{id}',
+    tags: ['Engagements'],
+    summary:
+      'Delete a fund (soft: kept with its whole review and restorable; hidden everywhere else). Refused while its analysis or its group’s Consolidated Review runs',
+    params: IdParams,
+    body: DeleteEngagementBody,
+    ok: DeleteEngagementResponse,
+    errs: [400, 401, 403, 404, 409]
+  });
+  add({
+    method: 'post',
+    path: '/api/engagements/{id}/restore',
+    tags: ['Engagements'],
+    summary: 'Restore a deleted fund with everything it had (refused if a live fund has the same entity, name and year end)',
+    params: IdParams,
+    ok: RestoreEngagementResponse,
+    errs: [400, 401, 403, 404, 409]
   });
   add({
     method: 'get',

@@ -103,10 +103,16 @@ export async function loadGroups(engagements: EngagementRepository, entities: En
 }
 
 /** What changed since a review: funds re-analysed, added to the group, or no longer in it. */
-export function staleness(review: ConsolidatedReviewRecord | null, group: Group, latestRunOf: Map<string, string>) {
+export function staleness(
+  review: ConsolidatedReviewRecord | null,
+  group: Group,
+  latestRunOf: Map<string, string>,
+  /** names of funds no longer in the group (a deleted fund is never named) */
+  formerName: (id: string) => string = () => 'a fund no longer in the group'
+) {
   if (!review) return null;
   const read = review.runIds || {};
-  const name = (id: string) => group.funds.find((f) => f.engagementId === id)?.fundName || id;
+  const name = (id: string) => group.funds.find((f) => f.engagementId === id)?.fundName || formerName(id);
   const changed = group.funds
     .filter((f) => f.engagementId in read && (read[f.engagementId] ?? null) !== (latestRunOf.get(f.engagementId) ?? null))
     .map((f) => f.fundName);
@@ -182,11 +188,15 @@ export class GetConsolidatedReview {
     private readonly signoffs: SignoffRepository
   ) {}
 
-  /** Each listed point as it is now (its status, and whether it is already shared): the review keeps refs only. */
-  private async live(result: Record<string, unknown> | null) {
+  /**
+   * Each listed point as it is now (its status, and whether it is already shared): the review keeps refs only.
+   * Points of a fund no longer in the group (moved, or deleted) show as removed and cannot be shared from here.
+   */
+  private async live(result: Record<string, unknown> | null, group: Group) {
     const groups = (result?.groups as { points: { engagementId: string; ref: string; status: string }[] }[] | undefined) ?? [];
     if (!groups.length) return result;
-    const funds = [...new Set(groups.flatMap((g) => g.points.map((p) => p.engagementId)))];
+    const members = new Set(group.funds.map((f) => f.engagementId));
+    const funds = [...new Set(groups.flatMap((g) => g.points.map((p) => p.engagementId)))].filter((id) => members.has(id));
     const byRef = new Map<string, { id: string; status: string; sharedGroupId: string | null }>();
     for (const id of funds)
       for (const p of await this.points.listByEngagement(id))
@@ -214,6 +224,18 @@ export class GetConsolidatedReview {
       lockedFunds(this.signoffs)
     ]);
     const runOf = new Map(latestRuns.map((r) => [r.engagementId, r.id]));
+    // funds the last review read that are no longer in the group: moved to another client, or deleted
+    const members = new Set(group.funds.map((f) => f.engagementId));
+    const former = new Map<string, { name: string; deleted: boolean }>();
+    for (const id of Object.keys(done?.runIds ?? {}).filter((x) => !members.has(x))) {
+      const rec = await this.engagements.findIncludingDeleted(id);
+      former.set(id, {
+        name: rec?.deleted ? 'a deleted fund' : String(rec?.doc.fund?.name || 'a fund no longer in the group'),
+        deleted: !!rec?.deleted
+      });
+    }
+    // a review that read a fund since deleted would still show that fund's names, figures and summary: withheld until run again
+    const withheld = [...former.values()].some((f) => f.deleted);
     return {
       group: {
         groupKey,
@@ -230,9 +252,15 @@ export class GetConsolidatedReview {
       },
       latest: summaryOf(latest),
       review: done
-        ? { id: done.id, finishedAt: done.finishedAt, requestedBy: done.requestedBy, result: await this.live(done.result) }
+        ? {
+            id: done.id,
+            finishedAt: done.finishedAt,
+            requestedBy: done.requestedBy,
+            result: withheld ? null : await this.live(done.result, group),
+            ...(withheld ? { withheld: 'deletedFund' as const } : {})
+          }
         : null,
-      stale: staleness(done, group, runOf)
+      stale: staleness(done, group, runOf, (id) => former.get(id)?.name ?? 'a fund no longer in the group')
     };
   }
 }

@@ -1,7 +1,7 @@
 // The set of use cases the HTTP layer can call. Built once by container.ts; routes receive it and
 // never construct a use case or adapter themselves.
 import type { ActivityRecorder } from './activity/ActivityRecorder.js';
-import type { ListActivity } from './activity/ListActivity.js';
+import type { ListActivity, RecordAppActivity } from './activity/ListActivity.js';
 import type { GetAiSettings, GetAiStatus, SaveAiSettings, TestAiConnection } from './ai/AiSettingsUseCases.js';
 import type { RunAiStep } from './ai/RunAiStep.js';
 import type { GetAnalysisJob, StartAnalysis } from './analysis/AnalysisJobUseCases.js';
@@ -25,6 +25,7 @@ import type { UpdateUser } from './identity/UpdateUser.js';
 import type { ReadScannedPages } from './ocr/ReadScannedPages.js';
 import type { AnswerChecklistItem } from './review/ChecklistAnswerUseCases.js';
 import type { GetConsolidatedReview, ListConsolidatedGroups, StartConsolidatedReview } from './review/ConsolidatedReviewUseCases.js';
+import type { DeleteEngagement, ListDeletedEngagements, RestoreEngagement } from './review/DeleteEngagementUseCases.js';
 import type {
   AttachDocument,
   AttachSampleDocument,
@@ -56,6 +57,9 @@ export interface UseCases {
   saveEntity: SaveEntity;
   listEngagements: ListEngagements;
   saveEngagement: SaveEngagement;
+  deleteEngagement: DeleteEngagement;
+  restoreEngagement: RestoreEngagement;
+  listDeletedEngagements: ListDeletedEngagements;
   getCheckRuleConfig: GetCheckRuleConfig;
   saveCheckRuleConfig: SaveCheckRuleConfig;
   getChecklists: GetChecklists;
@@ -109,6 +113,7 @@ export interface UseCases {
   resetPassword: ResetPassword;
   activity: ActivityRecorder;
   listActivity: ListActivity;
+  recordAppActivity: RecordAppActivity;
   getAiStatus: GetAiStatus;
   getAiSettings: GetAiSettings;
   saveAiSettings: SaveAiSettings;

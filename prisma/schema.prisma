@@ -273,6 +273,11 @@ model Engagement {
   createdAt  DateTime @map("created_at")
   updatedBy  String?  @map("updated_by")
   updatedAt  DateTime @map("updated_at")
+  /// soft delete: hidden everywhere in the app while set, kept with all its data so it can be restored
+  deletedAt     DateTime? @map("deleted_at")
+  /// who deleted it: { id, name, role }
+  deletedBy     Json?     @map("deleted_by")
+  deletedReason String?   @map("deleted_reason") @db.Text
 
   entity    Entity?              @relation(fields: [entityId], references: [id], onDelete: Restrict)
   documents DocumentVersion[]
@@ -286,6 +291,7 @@ model Engagement {
 
   @@index([entityId])
   @@index([yearEnd])
+  @@index([deletedAt])
   @@map("engagements")
 }
 

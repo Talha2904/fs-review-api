@@ -14,7 +14,9 @@ export const ActivityEntrySchema = z
     ip: z.string(),
     engagementId: z.string().nullable(),
     fundName: z.string().nullable(),
-    usage: z.object({ step: z.string(), model: z.string(), input: z.number(), output: z.number() }).optional()
+    usage: z.object({ step: z.string(), model: z.string(), input: z.number(), output: z.number() }).optional(),
+    /** the entry's fund is deleted: shown without a link into it */
+    fundDeleted: z.literal(true).optional()
   })
   .openapi('ActivityEntry');
 

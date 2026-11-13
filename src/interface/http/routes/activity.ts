@@ -15,7 +15,7 @@ export function activityRoutes(uc: UseCases): Router {
   r.post('/activity', requirePerm('activity.write'), validate({ body: ActivityBody }), async (req, res, next) => {
     try {
       const b = req.body;
-      const entry = await uc.activity.record({
+      const entry = await uc.recordAppActivity.execute({
         actor: req.actor,
         category: b.category,
         summary: b.summary,

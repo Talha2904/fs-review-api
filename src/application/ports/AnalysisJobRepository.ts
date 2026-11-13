@@ -33,6 +33,6 @@ export interface AnalysisJobRepository {
   latest(engagementId: string): Promise<AnalysisJob | null>;
   /** The most recent job of every engagement that has one. */
   latestAll(): Promise<AnalysisJob[]>;
-  /** Jobs in one of these statuses, oldest first (used after a restart). */
+  /** Jobs of funds that are not deleted in one of these statuses, oldest first (used after a restart). */
   listByStatus(statuses: AnalysisJobStatus[]): Promise<AnalysisJob[]>;
 }
