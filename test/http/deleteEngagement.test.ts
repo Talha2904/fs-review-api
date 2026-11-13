@@ -35,8 +35,10 @@ async function related(x: World) {
   return { ent2, eng2: await fund('ABC Lending'), eng3: await fund('ABC Lending II') };
 }
 
-const del = (x: World, id: string, cookie: string, body: Record<string, unknown> = { confirmName: 'ABC Fund' }) =>
-  request(x.w.app).delete(`/api/engagements/${id}`).set('Cookie', cookie).send(body);
+const del = (x: World, id: string, cookie: string, body: Record<string, unknown> = { confirmName: 'ABC Fund' }) => {
+  x.w.clock.advance(1000);
+  return request(x.w.app).delete(`/api/engagements/${id}`).set('Cookie', cookie).send(body);
+};
 const restore = (x: World, id: string, cookie: string) => request(x.w.app).post(`/api/engagements/${id}/restore`).set('Cookie', cookie);
 const raise = async (x: World, engagementId: string, title: string) =>
   (await request(x.w.app).post(`/api/engagements/${engagementId}/points`).set('Cookie', x.reviewer).send({ content: { title } })).body
@@ -202,16 +204,22 @@ describe('deleting and restoring a fund', { timeout: 30_000 }, () => {
     // an entity that never had a fund still shows
     expect(await names()).toContain('New Client LP');
 
-    // its name stays taken, with a hint
-    const clash = await request(x.w.app)
-      .post('/api/entities')
-      .set('Cookie', x.manager)
-      .send({ name: 'abc funds icav', framework: 'FRS 102' });
-    expect(clash.status).toBe(409);
-    expect(clash.body.error.message).toContain('Restore one of its funds');
+    expect((await restore(x, eng2.id, x.admin)).status).toBe(200);
+    expect(await names()).toContain('ABC Lending LP');
 
+    // adding it again (the web sends a new id of its own) brings the hidden entity back with the new details; its deleted fund stays deleted
+    x.w.clock.advance(1000);
+    const again = await request(x.w.app)
+      .put('/api/entities/ent-web-new1')
+      .set('Cookie', x.manager)
+      .send({ name: 'abc funds icav', client: 'ABC New Client', framework: 'FRS 102' });
+    expect(again.status).toBe(200);
+    expect(again.body.entity.id).toBe(x.ent.id);
+    expect(await names()).toContain('abc funds icav');
+    expect(
+      (await request(x.w.app).get('/api/engagements/deleted').set('Cookie', x.admin)).body.funds.map((f: { id: string }) => f.id)
+    ).toContain(x.eng.id);
     expect((await restore(x, x.eng.id, x.admin)).status).toBe(200);
-    expect(await names()).toContain('ABC Funds ICAV');
     expect(ent2.id).toBeTruthy();
   });
 
