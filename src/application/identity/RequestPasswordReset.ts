@@ -67,7 +67,7 @@ export class RequestPasswordReset {
     try {
       await this.mailer.send({
         to: u.email,
-        ...passwordResetEmail({ name: u.name, username: u.username, link, expiresAt, minutes: RESET_MINUTES })
+        ...passwordResetEmail({ name: u.name, username: u.username, link, expiresAt, minutes: RESET_MINUTES, appUrl: this.appUrl })
       });
       await this.activity.record({
         actor: actorOf(u),

@@ -315,7 +315,7 @@ export function buildContainer(env: Env): Container {
     getBilling: new GetBilling(billingActions, engagements),
     applyBillingAction: new ApplyBillingAction(billingActions),
     getIntegrations: new GetIntegrations(mailer, xero, xeroConnections, env.BILLING_FX_AUTO),
-    emailInvoice: new EmailInvoice(billingActions, billing, mailer),
+    emailInvoice: new EmailInvoice(billingActions, billing, mailer, env.APP_URL),
     refreshFxRate,
     connectXero: new ConnectXero(xero, xeroConnections, tokens, clock),
     disconnectXero: new DisconnectXero(xeroConnections),

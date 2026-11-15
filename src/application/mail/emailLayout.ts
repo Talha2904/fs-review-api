@@ -19,14 +19,32 @@ export interface EmailLayoutInput {
   notes?: string[];
   /** Small print under the card; defaults to the automatic, don't-reply line. */
   footer?: string;
+  /** The web app's address (APP_URL): the header shows the StatementArc logo image from it; without it, the name in text. */
+  appUrl?: string;
 }
 
 // The product name in every email.
-const PRODUCT = 'StatementIQ';
+const PRODUCT = 'StatementArc';
 const NO_REPLY = `Sent automatically by ${PRODUCT}. Please don’t reply to this email; replies aren’t read.`;
 const INK = '#1C1C1C';
 const MUTED = '#5B5B5B';
 const FONT = "font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
+// The "Arc" of the name where the logo image cannot be shown: a darker shade of the brand teal, readable on white
+const ARC = '#2C8C80';
+
+/**
+ * The header: the StatementArc wordmark as an image (public/email-logo.png in the web app; email apps do not show
+ * the app's animated SVG), with the name as its alternative text for apps that block images; then "By Project
+ * Accountants". Without the app's address, the name in text.
+ */
+function header(appUrl?: string): string {
+  const by = `<span style="font-weight:400;color:${MUTED};"> · By Project Accountants</span>`;
+  const base = (appUrl || '').replace(/\/+$/, '');
+  if (!/^https?:\/\//.test(base))
+    return `<td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">Statement<span style="color:${ARC};">Arc</span>${by}</td>`;
+  const src = escapeHtml(`${base}/email-logo.png`);
+  return `<td style="padding:0 4px 16px;${FONT}font-size:14px;line-height:22px;color:${INK};"><img src="${src}" width="161" height="22" alt="${PRODUCT}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;width:161px;height:22px;${FONT}font-size:16px;font-weight:600;color:${INK};">${by}</td>`;
+}
 
 export const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -48,7 +66,7 @@ export function emailLayout(m: EmailLayoutInput): string {
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(m.preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F6FA;"><tr><td align="center" style="padding:32px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-    <tr><td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">${PRODUCT}<span style="font-weight:400;color:${MUTED};"> · By Project Accountants</span></td></tr>
+    <tr>${header(m.appUrl)}</tr>
     <tr><td style="background:#ffffff;border-radius:16px;padding:32px 28px;border:1px solid #E4E7EC;">
       <h1 style="margin:0 0 16px;${FONT}font-size:22px;line-height:30px;font-weight:600;color:${INK};">${escapeHtml(m.heading)}</h1>
       ${m.paragraphs.map((p) => para(p, 15, INK, '0 0 16px')).join('\n      ')}
@@ -78,26 +96,34 @@ export function emailText(m: EmailLayoutInput): string {
 const ukTime = (iso: string) =>
   new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }).format(new Date(iso)) + ' (UK time)';
 
-export function passwordResetEmail(p: { name: string; username: string; link: string; expiresAt: string; minutes: number }): EmailContent {
+export function passwordResetEmail(p: {
+  name: string;
+  username: string;
+  link: string;
+  expiresAt: string;
+  minutes: number;
+  appUrl?: string;
+}): EmailContent {
   const first = p.name.trim().split(/\s+/)[0] || p.name;
   const m: EmailLayoutInput = {
     preheader: `Choose a new password for ${p.username}. The link expires at ${ukTime(p.expiresAt)}.`,
     heading: 'Reset your password',
     paragraphs: [
       `Hello ${first},`,
-      `Someone asked to reset the password for your StatementIQ account, ${p.username}. Choose a new password with the button below.`
+      `Someone asked to reset the password for your StatementArc account, ${p.username}. Choose a new password with the button below.`
     ],
     button: { label: 'Choose a new password', url: p.link },
     notes: [
       `The link works once and expires at ${ukTime(p.expiresAt)}, ${p.minutes} minutes after it was requested.`,
       'If you didn’t ask for this, ignore this email. Your password hasn’t changed, and nobody can change it without this link.'
-    ]
+    ],
+    ...(p.appUrl ? { appUrl: p.appUrl } : {})
   };
-  return { subject: 'Reset your StatementIQ password', text: emailText(m), html: emailLayout(m) };
+  return { subject: 'Reset your StatementArc password', text: emailText(m), html: emailLayout(m) };
 }
 
 /** An invoice email: Finance's own message, in the firm's layout, with the PDF attached by the caller. */
-export function invoiceEmail(p: { subject: string; message: string; number: string; firmName: string }): EmailContent {
+export function invoiceEmail(p: { subject: string; message: string; number: string; firmName: string; appUrl?: string }): EmailContent {
   const m: EmailLayoutInput = {
     preheader: `Invoice ${p.number}${p.firmName ? ` from ${p.firmName}` : ''}. The PDF is attached.`,
     heading: `Invoice ${p.number}`,
@@ -106,7 +132,8 @@ export function invoiceEmail(p: { subject: string; message: string; number: stri
       .map((x) => x.trim())
       .filter(Boolean),
     notes: ['The invoice is attached to this email as a PDF.'],
-    footer: p.firmName ? `Sent by ${p.firmName} through StatementIQ.` : 'Sent through StatementIQ.'
+    footer: p.firmName ? `Sent by ${p.firmName} through StatementArc.` : 'Sent through StatementArc.',
+    ...(p.appUrl ? { appUrl: p.appUrl } : {})
   };
   return { subject: p.subject, text: p.message, html: emailLayout(m) };
 }

@@ -78,7 +78,9 @@ export class EmailInvoice {
   constructor(
     private readonly actions: BillingActions,
     private readonly billing: BillingRepository,
-    private readonly mailer: Mailer
+    private readonly mailer: Mailer,
+    /** the web app's address: the email header shows the logo from it */
+    private readonly appUrl = ''
   ) {}
   async execute(actor: Actor | null, matrix: PermissionMatrix, input: EmailInvoiceInput, ip?: string) {
     const by = requirePermission(actor, 'billing.manage', matrix);
@@ -103,7 +105,8 @@ export class EmailInvoice {
           subject: String(input.subject || '').slice(0, 200),
           message: String(input.message || '').slice(0, 5000),
           number: inv.number || '',
-          firmName
+          firmName,
+          appUrl: this.appUrl
         }),
         attachments: [
           { filename: input.fileName || `${inv.number}.pdf`, content: Buffer.from(input.pdf, 'base64'), contentType: 'application/pdf' }
