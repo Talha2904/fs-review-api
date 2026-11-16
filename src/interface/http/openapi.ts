@@ -835,10 +835,10 @@ export function buildOpenApi(version: string) {
   return new OpenApiGeneratorV31(reg.definitions).generateDocument({
     openapi: '3.1.0',
     info: {
-      title: 'StatementArc API',
+      title: 'StatementX API',
       version,
       description:
-        'Review workflow, identity, AI proxy, OCR and billing for StatementArc. Errors always have the shape { error: { code, message, details? } }.'
+        'Review workflow, identity, AI proxy, OCR and billing for StatementX. Errors always have the shape { error: { code, message, details? } }.'
     },
     servers: [{ url: '/' }]
   });

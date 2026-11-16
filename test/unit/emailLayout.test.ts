@@ -21,7 +21,7 @@ describe('email layout', () => {
 
   it('sends the reset link as a button and as plain text, with the expiry in UK time', () => {
     const m = reset();
-    expect(m.subject).toBe('Reset your StatementArc password');
+    expect(m.subject).toBe('Reset your StatementX password');
     expect(m.html).toContain('href="https://fs.example.com/?reset=abc123"');
     expect(m.html).toContain('Hello Talha,');
     expect(m.text).toContain('https://fs.example.com/?reset=abc123');
@@ -40,11 +40,11 @@ describe('email layout', () => {
     });
     expect(m.text).toBe('Dear client,\n\nPlease find the invoice attached.');
     expect(m.html).toContain('>Dear client,</p>');
-    expect(m.html).toContain('Sent by PA Ltd through StatementArc.');
+    expect(m.html).toContain('Sent by PA Ltd through StatementX.');
     expect(m.html).not.toContain('don’t reply');
   });
 
-  it('shows the StatementArc logo image from the app, named for email apps that block images; the name in text without the app address', () => {
+  it('shows the StatementX logo image from the app, named for email apps that block images; the name in text without the app address', () => {
     const withLogo = passwordResetEmail({
       name: 'Talha',
       username: 't',
@@ -54,11 +54,11 @@ describe('email layout', () => {
       appUrl: 'https://fs.example.com/'
     });
     expect(withLogo.html).toContain('<img src="https://fs.example.com/email-logo.png"');
-    expect(withLogo.html).toContain('alt="StatementArc"');
+    expect(withLogo.html).toContain('alt="StatementX"');
     expect(withLogo.html).toContain('By Project Accountants');
     const noLogo = reset();
     expect(noLogo.html).not.toContain('<img');
-    expect(noLogo.html).toContain('Statement<span style="color:#2C8C80;">Arc</span>');
+    expect(noLogo.html).toContain('Statement<span style="color:#2C8C80;">X</span>');
     expect(invoiceEmail({ subject: 's', message: 'm', number: 'INV-1', firmName: '', appUrl: 'https://fs.example.com' }).html).toContain(
       'https://fs.example.com/email-logo.png'
     );

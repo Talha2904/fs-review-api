@@ -19,21 +19,21 @@ export interface EmailLayoutInput {
   notes?: string[];
   /** Small print under the card; defaults to the automatic, don't-reply line. */
   footer?: string;
-  /** The web app's address (APP_URL): the header shows the StatementArc logo image from it; without it, the name in text. */
+  /** The web app's address (APP_URL): the header shows the StatementX logo image from it; without it, the name in text. */
   appUrl?: string;
 }
 
 // The product name in every email.
-const PRODUCT = 'StatementArc';
+const PRODUCT = 'StatementX';
 const NO_REPLY = `Sent automatically by ${PRODUCT}. Please don’t reply to this email; replies aren’t read.`;
 const INK = '#1C1C1C';
 const MUTED = '#5B5B5B';
 const FONT = "font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-// The "Arc" of the name where the logo image cannot be shown: a darker shade of the brand teal, readable on white
-const ARC = '#2C8C80';
+// The X of the name where the logo image cannot be shown: a darker shade of the brand teal, readable on white
+const MARK = '#2C8C80';
 
 /**
- * The header: the StatementArc wordmark as an image (public/email-logo.png in the web app; email apps do not show
+ * The header: the StatementX wordmark as an image (public/email-logo.png in the web app; email apps do not show
  * the app's animated SVG), with the name as its alternative text for apps that block images; then "By Project
  * Accountants". Without the app's address, the name in text.
  */
@@ -41,9 +41,9 @@ function header(appUrl?: string): string {
   const by = `<span style="font-weight:400;color:${MUTED};"> · By Project Accountants</span>`;
   const base = (appUrl || '').replace(/\/+$/, '');
   if (!/^https?:\/\//.test(base))
-    return `<td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">Statement<span style="color:${ARC};">Arc</span>${by}</td>`;
+    return `<td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">Statement<span style="color:${MARK};">X</span>${by}</td>`;
   const src = escapeHtml(`${base}/email-logo.png`);
-  return `<td style="padding:0 4px 16px;${FONT}font-size:14px;line-height:22px;color:${INK};"><img src="${src}" width="161" height="22" alt="${PRODUCT}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;width:161px;height:22px;${FONT}font-size:16px;font-weight:600;color:${INK};">${by}</td>`;
+  return `<td style="padding:0 4px 16px;${FONT}font-size:14px;line-height:22px;color:${INK};"><img src="${src}" width="128" height="22" alt="${PRODUCT}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;width:128px;height:22px;${FONT}font-size:16px;font-weight:600;color:${INK};">${by}</td>`;
 }
 
 export const escapeHtml = (s: string): string =>
@@ -110,7 +110,7 @@ export function passwordResetEmail(p: {
     heading: 'Reset your password',
     paragraphs: [
       `Hello ${first},`,
-      `Someone asked to reset the password for your StatementArc account, ${p.username}. Choose a new password with the button below.`
+      `Someone asked to reset the password for your StatementX account, ${p.username}. Choose a new password with the button below.`
     ],
     button: { label: 'Choose a new password', url: p.link },
     notes: [
@@ -119,7 +119,7 @@ export function passwordResetEmail(p: {
     ],
     ...(p.appUrl ? { appUrl: p.appUrl } : {})
   };
-  return { subject: 'Reset your StatementArc password', text: emailText(m), html: emailLayout(m) };
+  return { subject: 'Reset your StatementX password', text: emailText(m), html: emailLayout(m) };
 }
 
 /** An invoice email: Finance's own message, in the firm's layout, with the PDF attached by the caller. */
@@ -132,7 +132,7 @@ export function invoiceEmail(p: { subject: string; message: string; number: stri
       .map((x) => x.trim())
       .filter(Boolean),
     notes: ['The invoice is attached to this email as a PDF.'],
-    footer: p.firmName ? `Sent by ${p.firmName} through StatementArc.` : 'Sent through StatementArc.',
+    footer: p.firmName ? `Sent by ${p.firmName} through StatementX.` : 'Sent through StatementX.',
     ...(p.appUrl ? { appUrl: p.appUrl } : {})
   };
   return { subject: p.subject, text: p.message, html: emailLayout(m) };
