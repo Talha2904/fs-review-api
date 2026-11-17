@@ -448,7 +448,8 @@ export class RunConsolidatedReview {
         groups,
         summary,
         aiNote,
-        groupBalances: base.groupBalances ?? null
+        groupBalances: base.groupBalances ?? null,
+        policies: base.policies ?? []
       };
       rec = { ...rec, status: 'done', step: rec.total, runIds, result, finishedAt: this.d.clock.nowIso() };
       await this.save(rec); // only while still running: a review given up as stuck meanwhile stays failed

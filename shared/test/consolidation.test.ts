@@ -8,6 +8,7 @@ import {
   consolidate,
   groupCommonPoints,
   groupKeyOf,
+  legendEntries,
   memberNames,
   type AnalysisResult,
   type Doc,
@@ -462,5 +463,164 @@ describe('balances with the group in general (no member named)', () => {
     const g = consolidate([a, b, c], []).groupBalances!;
     expect(g).toMatchObject({ currency: null, difference: null, status: 'different-currency' });
     expect(g.funds.find((f) => f.engagementId === 'b')!.currency).toBe('USD');
+  });
+});
+
+describe('related-party tables that name the other side by a code, explained in a legend below', () => {
+  // as in the Alderwick packs: "PD-H  PD-L01 receivable  9,160,000" … "Counterparties" … "PD-H - Alderwick Lending Holdings Limited"
+  const coded = (rows: [string, number][], legend: string[]): Doc => ({
+    title: 'Draft',
+    blocks: [
+      { k: 'head', title: 'Statement of financial position' },
+      { k: 'table', cols: ['2025', '2024'], rows: [{ l: 'Cash', v: [1, 0] }] },
+      { k: 'head', title: '6. Related-party balances' },
+      { k: 'para', text: 'Gross carrying amounts; counterparty IDs map to legal names below.' },
+      { k: 'table', cols: ['2025', '2024'], label: 'Party Balance', rows: rows.map(([l, v]) => ({ l, v: [v, null] })) },
+      { k: 'para', text: 'Counterparties' },
+      ...legend.map((text) => ({ k: 'para', text })),
+      { k: 'para', text: 'Terms' }
+    ]
+  });
+  const fund = member(
+    'f',
+    'Alderwick Direct Lending I, L.P.',
+    'Alderwick Direct Lending I, L.P.',
+    coded(
+      [
+        ['PD-H PD-L01 receivable', 9160000],
+        ['PD-H PD-I01 receivable', 80000],
+        ['PD-S PD-B02 receivable', 10000]
+      ],
+      ['PD-H - Alderwick Lending Holdings Limited', 'PD-S - Alderwick Lending Services Limited']
+    )
+  );
+  const holdco = member(
+    'h',
+    'Alderwick Lending Holdings Limited',
+    'Alderwick Lending Holdings Limited',
+    coded(
+      [
+        ['PD-F PD-I01 payable', 80000],
+        ['PD-F PD-L01 payable', 9120000]
+      ],
+      ['PD-F - Alderwick Direct Lending I, L.P.']
+    )
+  );
+
+  it('reads the legend, pairs each coded line by its reference, and shows a difference', () => {
+    const r = consolidate([fund, holdco], []);
+    const byRef = new Map(r.links.map((l) => [l.a.ref, l]));
+    expect(r.links).toHaveLength(2);
+    expect(byRef.get('PD-I01')).toMatchObject({ status: 'agrees' });
+    expect(byRef.get('PD-L01')).toMatchObject({ status: 'differs', difference: 40000 });
+    expect(byRef.get('PD-L01')!.b.ref).toBe('PD-L01');
+  });
+
+  it('keeps a coded line with a party outside the review as unmatched, and never lists the legend itself', () => {
+    const r = consolidate([fund, holdco], []);
+    expect(r.unmatched.map((c) => c.label)).toEqual(['PD-S PD-B02 receivable']);
+    expect(r.unmatched[0]!.mentions).toEqual([]);
+  });
+
+  it('only a paragraph that starts with a code is a legend', () => {
+    expect(legendEntries('PD-A02 - Alderwick Lending SPV 02 Limited')).toEqual([
+      { code: 'PD-A02', name: 'Alderwick Lending SPV 02 Limited' }
+    ]);
+    expect(legendEntries('PD-F - Alderwick Direct Lending I, L.P. PD-S - Alderwick Lending Services Limited').map((e) => e.code)).toEqual([
+      'PD-F',
+      'PD-S'
+    ]);
+    expect(legendEntries('The loan - unsecured - is repayable in 2028.')).toEqual([]);
+  });
+});
+
+describe('accounting policies that differ between funds', () => {
+  const notes = (paras: string[]): Doc => ({
+    title: 'Draft',
+    blocks: [{ k: 'head', title: '5. Investments and valuation' }, ...paras.map((text) => ({ k: 'para', text }))]
+  });
+  const common = 'All external holdings are unquoted. There are no disposals in the reporting period.';
+  const same = (id: string) =>
+    member(
+      id,
+      `Alderwick SPV ${id}`,
+      `Alderwick SPV ${id}`,
+      notes([`${common} Investment income is presented separately from changes in fair value.`])
+    );
+
+  it('finds the fund whose policy differs, and says what the others state in the same place', () => {
+    const odd = member(
+      'c',
+      'Alderwick SPV c',
+      'Alderwick SPV c',
+      notes([`${common} Investment income is capitalised and forms part of the investment value at year end.`])
+    );
+    const p = consolidate([same('a'), same('b'), odd], []).policies!;
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatchObject({
+      engagementId: 'c',
+      where: '5. Investments and valuation',
+      says: 'Investment income is capitalised and forms part of the investment value at year end.',
+      others: {
+        text: 'Investment income is presented separately from changes in fair value.',
+        funds: ['Alderwick SPV a', 'Alderwick SPV b']
+      }
+    });
+  });
+
+  it('ignores names, figures and wording that is not a policy, and needs three funds', () => {
+    const named = member(
+      'c',
+      'Alderwick SPV c',
+      'Alderwick SPV c',
+      notes([`${common} Investment income is presented separately from changes in fair value. The board met 14 times.`])
+    );
+    expect(consolidate([same('a'), same('b'), named], []).policies).toEqual([]);
+    const odd = member(
+      'c',
+      'Alderwick SPV c',
+      'Alderwick SPV c',
+      notes([`${common} Investment income is capitalised into the investment value.`])
+    );
+    expect(consolidate([same('a'), odd], []).policies).toEqual([]);
+  });
+
+  it('reports a stated change of policy even when no other fund says anything there', () => {
+    const changed = member(
+      'c',
+      'Alderwick SPV c',
+      'Alderwick SPV c',
+      notes([
+        `${common} Investment income is presented separately from changes in fair value.`,
+        'The company changed its accounting policy for transaction costs, which are now expensed.'
+      ])
+    );
+    const p = consolidate([same('a'), same('b'), changed], []).policies!;
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatchObject({ engagementId: 'c', others: null });
+  });
+});
+
+describe('accounting policies: audit fixes', () => {
+  const notes = (last: string): Doc => ({
+    title: 'Draft',
+    blocks: [
+      { k: 'head', title: 'Policies' },
+      { k: 'para', text: `All external holdings are unquoted. There are no disposals in the period. ${last}` }
+    ]
+  });
+  const usual = 'Investment income is presented separately from changes in fair value.';
+  const odd = 'Investment income is capitalised into the investment value.';
+  const fund = (id: string, last: string) => member(id, `Group SPV ${id}`, `Group SPV ${id}`, notes(last));
+
+  it('finds two funds that changed the same way, against the three that did not', () => {
+    const p = consolidate([fund('a', usual), fund('b', usual), fund('c', usual), fund('d', odd), fund('e', odd)], []).policies!;
+    expect(p.map((x) => x.engagementId)).toEqual(['d', 'e']);
+    expect(p[0]!.others!.funds).toHaveLength(3);
+  });
+
+  it('never reports a "no longer" sentence that is not a policy', () => {
+    const p = consolidate([fund('a', usual), fund('b', usual), fund('c', `${usual} The company no longer has employees.`)], []).policies;
+    expect(p).toEqual([]);
   });
 });

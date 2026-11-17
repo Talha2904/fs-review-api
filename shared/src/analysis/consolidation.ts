@@ -48,6 +48,8 @@ export interface LinkCandidate {
   side: LinkSide;
   /** members (engagementIds) this line names */
   mentions: string[];
+  /** a balance reference both sides may quote ("IC-01", "PD-L01"); the same reference is the better partner */
+  ref?: string | undefined;
 }
 
 export type LinkStatus = 'agrees' | 'differs' | 'different-currency' | 'no-amount';
@@ -81,6 +83,20 @@ export interface ConsolidationResult {
   summary: string;
   /** the group-wide balances ("due from group entities") of every fund added up: what the group is owed against what it owes */
   groupBalances?: GroupBalances | null;
+  /** accounting policies a fund states differently from the rest of the group */
+  policies?: PolicyDifference[];
+}
+
+/** A policy sentence one fund states where the other funds of the group say something else. */
+export interface PolicyDifference {
+  engagementId: string;
+  fundName: string;
+  /** the note it is in */
+  where: string;
+  /** what this fund says */
+  says: string;
+  /** what the other funds say in the same place, and which of them say it; null when they say nothing there */
+  others: { text: string; funds: string[] } | null;
 }
 
 /**
@@ -219,14 +235,63 @@ export function amountIn(sentence: string): number | null {
   return null;
 }
 
+// ---- counterparty legends -------------------------------------------------------------------------------
+
+/**
+ * A related-party note may name the other side by a code and explain the codes below the table:
+ * "PD-H  PD-A01-L02 payable  2,150,000" … "Counterparties: PD-H - Alderwick Lending Holdings Limited".
+ * A code is one word of capitals and digits (hyphens allowed); single letters are left out, they are too common.
+ */
+const CODE = '[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){0,3}';
+const LEGEND_ENTRY = new RegExp(`(?:^|\\s)(${CODE})\\s+[-–—]\\s+`, 'g');
+const isCode = (w: string): boolean => new RegExp(`^${CODE}$`).test(w) && w.length >= 2 && w.length <= 16;
+
+/** The codes a paragraph explains: "PD-F - Alderwick Direct Lending I, L.P." (several may run together). */
+export function legendEntries(text: string): { code: string; name: string }[] {
+  const hits = [...String(text).matchAll(LEGEND_ENTRY)].filter((m) => isCode(m[1]!));
+  // a legend paragraph starts with an entry; a sentence that only contains " - " somewhere is not one
+  if (!hits.length || hits[0]!.index !== 0) return [];
+  return hits
+    .map((m, i) => ({
+      code: m[1]!,
+      name: String(text)
+        .slice(m.index! + m[0].length, hits[i + 1]?.index ?? undefined)
+        .trim()
+    }))
+    .filter((e) => e.name.length >= 3);
+}
+
+/** Every code explained in the fund's related-party notes, with the members each one names (none when outside the group). */
+function legendOf(cy: Doc, self: string, known: Map<string, string[][]>): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  let inNote = false;
+  for (const b of cy.blocks || []) {
+    if (b.k === 'head') inNote = NOTE_HEAD.test(b.title || '');
+    else if (inNote && b.k === 'para' && b.text)
+      for (const e of legendEntries(b.text)) if (!out.has(e.code)) out.set(e.code, names(e.name, self, known));
+  }
+  return out;
+}
+
+/** The legend codes a line quotes, and its own reference: another code-like word with a digit ("IC-01", "PD-A01-L02"). */
+function codesIn(label: string, legend: Map<string, string[]>): { parties: string[]; ref?: string } {
+  const words = label.split(/\s+/).filter(Boolean);
+  const parties = words.filter((w) => legend.has(w));
+  const ref = words.find((w) => !legend.has(w) && isCode(w) && /\d/.test(w) && /-/.test(w));
+  return { parties, ...(ref ? { ref } : {}) };
+}
+
 /** Balance-sheet lines and related-party note lines of one fund's current-year draft. */
 export function linkCandidates(member: GroupMember, known: Map<string, string[][]>): LinkCandidate[] {
   const cy: Doc | undefined = member.result?.docs?.cy;
   if (!cy) return [];
   const out: LinkCandidate[] = [];
+  const legend = legendOf(cy, member.engagementId, known);
   const add = (where: string, label: string, amount: number | null, side: LinkSide, extra = '') => {
-    const mentions = names(`${label} ${extra}`, member.engagementId, known);
-    if (!RELATED.test(label) && !mentions.length) return;
+    const { parties, ref } = codesIn(label, legend);
+    const mentions = [...new Set([...names(`${label} ${extra}`, member.engagementId, known), ...parties.flatMap((p) => legend.get(p)!)])];
+    // a line quoting a counterparty code is a related-party line, even when that party is outside the review
+    if (!RELATED.test(label) && !mentions.length && !parties.length) return;
     if (out.some((c) => c.where === where && c.label === label && c.amount === amount)) return;
     out.push({
       id: `${member.engagementId}#${out.length + 1}`,
@@ -237,7 +302,8 @@ export function linkCandidates(member: GroupMember, known: Map<string, string[][
       amount,
       currency: member.currency,
       side,
-      mentions
+      mentions,
+      ...(ref ? { ref } : {})
     });
   };
   // 1. the primary statements (balance sheet sides come from where the line sits)
@@ -260,6 +326,8 @@ export function linkCandidates(member: GroupMember, known: Map<string, string[][
         add(inNote, r.l, currentYear(r.v), sideOf(r.l));
       }
     else if (b.k === 'para' && b.text) {
+      // the legend under a coded table explains the codes; it is not a balance itself
+      if (legendEntries(b.text).length) continue;
       // a sentence that names another member is kept even without an amount, so the AI can pair it
       for (const sentence of String(b.text).split(/(?<=[.;])\s+/)) {
         const amt = amountIn(sentence);
@@ -285,7 +353,8 @@ const opposite = (a: LinkSide, b: LinkSide) => (a === 'receivable' && b === 'pay
 
 /**
  * Pairs lines that name each other: A's receivable naming B with B's payable naming A (or the reverse).
- * Where one line has several possible partners the closest amount wins. Each line is used once.
+ * Where one line has several possible partners, one quoting the same reference ("IC-01") wins, then the closest
+ * amount. Each line is used once.
  */
 export function matchByName(cands: LinkCandidate[], tol = 1): InterLink[] {
   const used = new Set<string>();
@@ -302,7 +371,8 @@ export function matchByName(cands: LinkCandidate[], tol = 1): InterLink[] {
     );
     if (!options.length) continue;
     const gap = (b: LinkCandidate) => (a.amount == null || b.amount == null ? Infinity : Math.abs(Math.abs(a.amount) - Math.abs(b.amount)));
-    const b = options.slice().sort((x, y) => gap(x) - gap(y))[0]!;
+    const sameRef = (b: LinkCandidate) => (a.ref && b.ref === a.ref ? 0 : 1);
+    const b = options.slice().sort((x, y) => sameRef(x) - sameRef(y) || gap(x) - gap(y))[0]!;
     used.add(a.id).add(b.id);
     links.push({ a, b, ...compareLink(a, b, tol), matchedBy: 'app' });
   }
@@ -523,6 +593,107 @@ const str = (v: unknown, max: number): string | undefined => (typeof v === 'stri
 
 // ---- the whole review, without AI -----------------------------------------------------------------------
 
+// ---- accounting policies --------------------------------------------------------------------------------
+
+/** Wording that states how something is measured, recognised or presented: an accounting policy. */
+const POLICY =
+  /\b(measured at|recognised|recognized|capitali[sz]ed|held at|at cost|fair value through|amortised cost|amortized cost|translated at|presented (separately|net|gross)|shown (gross|net)|accounted for|depreciat|amortis|amortiz|accounting polic|basis of (preparation|accounting)|going[- ]concern basis)/i;
+/** a fund saying it changed a policy needs no other fund to compare with */
+const CHANGED =
+  /\b(changed (its|the|our)?\s*(accounting )?polic|change (in|of|to) (its |the |our )?(accounting )?polic(y|ies) (was|has been|is)|no longer|previously (measured|recognised|recognized|held|presented|accounted)|instead of)/i;
+
+interface Sentence {
+  where: string;
+  raw: string;
+  key: string;
+}
+
+/** Every sentence of a fund's current-year notes, with a key that ignores the group's own names, figures, case and labels. */
+function sentencesOf(member: GroupMember, all: GroupMember[]): Sentence[] {
+  const cy: Doc | undefined = member.result?.docs?.cy;
+  if (!cy) return [];
+  const names = all
+    .flatMap((m) => [m.fundName, m.entityName])
+    .filter((n) => n && n.length >= 4)
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.toLowerCase());
+  const keyOf = (s: string) => {
+    let k = s.toLowerCase();
+    for (const n of names) k = k.split(n).join(' x ');
+    return k
+      .replace(/\d[\d,.]*/g, ' n ')
+      .replace(/[^a-z ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+  const out: Sentence[] = [];
+  let where = '';
+  for (const b of cy.blocks || []) {
+    if (b.k === 'head') where = String(b.title || '');
+    if (b.k !== 'para' || !b.text) continue;
+    // a reader may start a paragraph with its sub-heading ("Portfolio measurement: External loans …")
+    const text = String(b.text).replace(/^[A-Z][A-Za-z ,/&-]{2,60}:\s+(?=[A-Z])/, '');
+    for (const raw of text.split(/(?<=[.;])\s+(?=[A-Z])/)) {
+      const key = keyOf(raw);
+      if (key.length >= 20) out.push({ where, raw: raw.trim(), key });
+    }
+  }
+  return out;
+}
+
+/**
+ * Policies a fund states differently from the rest of the group. Funds of one group usually share most of their
+ * notes word for word, so a policy sentence only one fund has is compared with what the others say in the same
+ * place (after the same sentence, or before it): "Investment income is capitalised …" against "Investment income
+ * is presented separately …". A policy sentence held by fewer than half the funds is compared, so two funds that
+ * changed the same way are both found; what "the others" say must be said by at least two of them. A sentence
+ * saying a policy was changed is reported even with nothing to compare. Needs three or more analysed funds.
+ */
+export function policyDifferences(members: GroupMember[]): PolicyDifference[] {
+  const analysed = members.filter((m) => m.result);
+  if (analysed.length < 3) return [];
+  const sents = new Map(analysed.map((m) => [m.engagementId, sentencesOf(m, analysed)]));
+  const holders = new Map<string, Set<string>>();
+  for (const [id, list] of sents) for (const s of list) (holders.get(s.key) ?? holders.set(s.key, new Set()).get(s.key)!).add(id);
+  const out: PolicyDifference[] = [];
+  for (const m of analysed) {
+    const list = sents.get(m.engagementId)!;
+    const mine = new Set(list.map((s) => s.key));
+    list.forEach((s, i) => {
+      // a policy sentence that fewer than half the funds state (a fund saying "no longer" about anything else is no policy)
+      if (holders.get(s.key)!.size * 2 >= analysed.length || !POLICY.test(s.raw)) return;
+      // what the other funds say next to the same neighbouring sentence
+      const found = new Map<string, { text: string; funds: Set<string> }>();
+      for (const [nb, step] of [
+        [list[i - 1], 1],
+        [list[i + 1], -1]
+      ] as const) {
+        if (!nb || holders.get(nb.key)!.size < 2) continue;
+        for (const [id, other] of sents) {
+          if (id === m.engagementId) continue;
+          const j = other.findIndex((o) => o.key === nb.key);
+          const there = j < 0 ? undefined : other[j + step];
+          if (!there || mine.has(there.key) || !POLICY.test(there.raw)) continue;
+          const f = found.get(there.key) ?? found.set(there.key, { text: there.raw, funds: new Set() }).get(there.key)!;
+          f.funds.add(id);
+        }
+        if (found.size) break;
+      }
+      const best = [...found.values()].filter((f) => f.funds.size >= 2).sort((a, b) => b.funds.size - a.funds.size)[0];
+      if (!best && !CHANGED.test(s.raw)) return;
+      const nameOf = (id: string) => analysed.find((x) => x.engagementId === id)!.fundName;
+      out.push({
+        engagementId: m.engagementId,
+        fundName: m.fundName,
+        where: s.where,
+        says: s.raw,
+        others: best ? { text: best.text, funds: [...best.funds].map(nameOf) } : null
+      });
+    });
+  }
+  return out;
+}
+
 /** Everything the app can do on its own; the AI step (when allowed) adds to `links`, `groups` and `summary`. */
 export function consolidate(
   members: GroupMember[],
@@ -571,6 +742,7 @@ export function consolidate(
     groups,
     summary: '',
     groupBalances: groupBalancesOf(members, candidates, tol),
+    policies: policyDifferences(members),
     candidates,
     restPoints: rest
   };
