@@ -79,6 +79,24 @@ export interface ConsolidationResult {
   unmatched: LinkCandidate[];
   groups: PointGroup[];
   summary: string;
+  /** the group-wide balances ("due from group entities") of every fund added up: what the group is owed against what it owes */
+  groupBalances?: GroupBalances | null;
+}
+
+/**
+ * Balances with the group in general, naming no member: inside one group every such receivable is some member's
+ * payable, so the group's totals of each should agree (they eliminate on consolidation).
+ */
+export interface GroupBalances {
+  /** null when the funds use different currencies: then no totals are compared */
+  currency: string | null;
+  owedTo: number;
+  owedBy: number;
+  difference: number | null;
+  status: 'agrees' | 'differs' | 'different-currency';
+  funds: { engagementId: string; fundName: string; currency: string; owedTo: number; owedBy: number; lines: string[] }[];
+  /** funds of the group with no analysis: their balances are missing from the totals */
+  notAnalysed: string[];
 }
 
 // ---- names ----------------------------------------------------------------------------------------------
@@ -209,7 +227,7 @@ export function linkCandidates(member: GroupMember, known: Map<string, string[][
   const add = (where: string, label: string, amount: number | null, side: LinkSide, extra = '') => {
     const mentions = names(`${label} ${extra}`, member.engagementId, known);
     if (!RELATED.test(label) && !mentions.length) return;
-    if (out.some((c) => c.where === where && c.label === label)) return;
+    if (out.some((c) => c.where === where && c.label === label && c.amount === amount)) return;
     out.push({
       id: `${member.engagementId}#${out.length + 1}`,
       engagementId: member.engagementId,
@@ -289,6 +307,95 @@ export function matchByName(cands: LinkCandidate[], tol = 1): InterLink[] {
     links.push({ a, b, ...compareLink(a, b, tol), matchedBy: 'app' });
   }
   return links;
+}
+
+// ---- balances with the group in general ------------------------------------------------------------------
+
+/** "Due to group entities", "Amounts owed by group undertakings", "Intercompany payable": the group, no member named. */
+const GROUP_WIDE = /\b(group|intercompan|inter-?company|fellow subsidiar)/i;
+/** "group" that is not the group of entities */
+const NOT_GROUP = /\b(disposal group|group of assets)/i;
+/** investments in, and capital of, subsidiaries are not balances owed */
+const NOT_OWED = /\b(investment|share capital|shares)\b/i;
+
+/** A balance-sheet amount owed to or by someone, not an investment or a disposal group. */
+const owedOnBalanceSheet = (c: LinkCandidate): boolean =>
+  c.side !== 'flow' &&
+  c.amount != null &&
+  /financial position|balance sheet/i.test(c.where) &&
+  !NOT_OWED.test(c.label) &&
+  !NOT_GROUP.test(c.label);
+
+/** A balance-sheet line owed to or by the group in general, naming no member. */
+export const isGroupWide = (c: LinkCandidate): boolean => !c.mentions.length && owedOnBalanceSheet(c) && GROUP_WIDE.test(c.label);
+
+/** A balance-sheet line owed to or by another member: one naming it, or the group in general. */
+export const isGroupBalance = (c: LinkCandidate): boolean => owedOnBalanceSheet(c) && (c.mentions.length > 0 || GROUP_WIDE.test(c.label));
+
+/**
+ * In a group of exactly two funds, both analysed, "the group" can only be the other fund: when one fund has a single
+ * group-wide receivable and the other a single group-wide payable, the two are paired (and the reverse). With several
+ * lines on a side nothing is paired line by line; the group totals compare them.
+ */
+export function matchGroupWideOfTwo(members: GroupMember[], cands: LinkCandidate[], tol = 1): InterLink[] {
+  if (members.length !== 2 || members.some((m) => !m.result)) return [];
+  const wide = cands.filter(isGroupWide);
+  const [x, y] = members.map((m) => m.engagementId) as [string, string];
+  const links: InterLink[] = [];
+  for (const [from, to] of [
+    [x, y],
+    [y, x]
+  ] as const) {
+    const a = wide.filter((c) => c.engagementId === from && c.side === 'receivable');
+    const b = wide.filter((c) => c.engagementId === to && c.side === 'payable');
+    if (a.length === 1 && b.length === 1)
+      links.push({
+        a: a[0]!,
+        b: b[0]!,
+        ...compareLink(a[0]!, b[0]!, tol),
+        matchedBy: 'app',
+        relationship: 'Group balance: the only other fund in the group'
+      });
+  }
+  return links;
+}
+
+/**
+ * Every fund's balances with the group added up: lines naming another member and lines naming the group in general.
+ * Inside one group, what the funds are owed should equal what they owe. Amounts are taken as positive, as in
+ * compareLink. Null when no fund has any.
+ */
+export function groupBalancesOf(members: GroupMember[], cands: LinkCandidate[], tol = 1): GroupBalances | null {
+  const lines = cands.filter(isGroupBalance);
+  if (!lines.some(isGroupWide)) return null; // without a group-wide line the pairs by name already say it all
+  const currencies = new Set(lines.map((c) => c.currency));
+  const currency = currencies.size === 1 ? [...currencies][0]! : null;
+  const sum = (list: LinkCandidate[]) => list.reduce((t, c) => t + Math.abs(c.amount ?? 0), 0);
+  const funds = members
+    .filter((m) => m.result)
+    .map((m) => {
+      const of = lines.filter((c) => c.engagementId === m.engagementId);
+      return {
+        engagementId: m.engagementId,
+        fundName: m.fundName,
+        currency: m.currency,
+        owedTo: sum(of.filter((c) => c.side === 'receivable')),
+        owedBy: sum(of.filter((c) => c.side === 'payable')),
+        lines: of.map((c) => c.id)
+      };
+    });
+  const owedTo = sum(lines.filter((c) => c.side === 'receivable')),
+    owedBy = sum(lines.filter((c) => c.side === 'payable'));
+  const difference = currency ? owedTo - owedBy : null;
+  return {
+    currency,
+    owedTo,
+    owedBy,
+    difference,
+    status: difference == null ? 'different-currency' : Math.abs(difference) <= tol ? 'agrees' : 'differs',
+    funds,
+    notAnalysed: members.filter((m) => !m.result).map((m) => m.fundName)
+  };
 }
 
 // ---- common review points -------------------------------------------------------------------------------
@@ -425,7 +532,23 @@ export function consolidate(
   const analysed = members.filter((m) => m.result);
   const known = memberNames(analysed);
   const candidates = analysed.flatMap((m) => linkCandidates(m, known));
-  const links = matchByName(candidates, tol);
+  const byName = matchByName(candidates, tol);
+  const pairedByName = new Set(byName.flatMap((l) => [l.a.id, l.b.id]));
+  // with two funds, a balance with "the group" is a balance with the other fund
+  // a line naming a fund not yet analysed is with that fund, not with "the group"
+  const notAnalysed = new Set(members.filter((m) => !m.result).map((m) => m.engagementId));
+  const knownAll = notAnalysed.size ? memberNames(members) : known;
+  const namesNotAnalysed = (c: LinkCandidate) =>
+    notAnalysed.size > 0 && names(c.label, c.engagementId, knownAll).some((id) => notAnalysed.has(id));
+  // with two funds, a balance with "the group" is a balance with the other fund
+  const links = [
+    ...byName,
+    ...matchGroupWideOfTwo(
+      members,
+      candidates.filter((c) => !pairedByName.has(c.id) && !namesNotAnalysed(c)),
+      tol
+    )
+  ];
   const linked = new Set(links.flatMap((l) => [l.a.id, l.b.id]));
   const fundName = (id: string) => members.find((m) => m.engagementId === id)?.fundName || id;
   const { groups, rest } = groupCommonPoints(
@@ -447,6 +570,7 @@ export function consolidate(
     unmatched: candidates.filter((c) => !linked.has(c.id)),
     groups,
     summary: '',
+    groupBalances: groupBalancesOf(members, candidates, tol),
     candidates,
     restPoints: rest
   };

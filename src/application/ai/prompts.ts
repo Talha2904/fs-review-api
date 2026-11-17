@@ -244,7 +244,10 @@ export const TOOLS: Record<'extract' | 'points' | 'variance' | 'versionPass' | '
             required: ['title', 'points']
           }
         },
-        summary: { type: 'string', description: 'two to four sentences for the partner' }
+        summary: {
+          type: 'string',
+          description: 'the conclusion for the partner in one or two short sentences, under 40 words, not in the first person'
+        }
       },
       required: ['pairs', 'groups', 'summary']
     }
@@ -374,7 +377,7 @@ Keep each note to one or two short sentences: there may be many lines.`,
     `These are related entities reviewed together. You are given, for the entities whose clients permit AI: the entities (id, name, type); balance-sheet and related-party note lines that may involve another entity in the group (id, fund, where, label, amount, currency, side: receivable, payable, or flow for a charge or income in the year); and the open review points of each fund. A label may be a short sentence from a related-party note. Each line carries its own currency.
 1. Pairs: match a line in one entity with the line in another entity that records the same balance or transaction from the other side, e.g. a fund's management fee payable with the manager's fee receivable from that fund, or a loan receivable with the borrower's loan payable. Entities are often named by role ("the manager", "the general partner", "the parent"): use the entity types and names to decide which entity is meant. Pair only when the lines support it; never pair two lines of the same entity, and use each line at most once. Do not compute or restate differences: the app compares the amounts.
 2. Groups: list review points from two or more funds that describe the same matter, even if worded differently. Leave out points that only look alike.
-3. Summary: two to four sentences for the partner on the links found, which do not agree, and matters common to several funds.
+3. Summary: the conclusion for the partner in one or two short sentences, under 40 words. Lead with the finding itself (e.g. "Three matters recur across the funds; the related-party notes need the most attention."), never with "I" or "I found", and do not write in the first person. Do not list the matters, lines or amounts: the app shows them in tables. Mention one matter only if it needs the partner's attention first.
 Return empty lists where nothing qualifies. Do not invent lines, points or ids.`,
 
   versionPass: (): string =>

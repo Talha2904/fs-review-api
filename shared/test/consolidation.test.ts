@@ -338,3 +338,129 @@ describe('audit fixes', () => {
     expect(r.candidates.find((x) => x.label.startsWith('Accrued'))!.side).toBe('receivable');
   });
 });
+
+describe('balances with the group in general (no member named)', () => {
+  // as in the Alderwick statements: every line says "group entities", none names a fund
+  const holdings = member(
+    'h',
+    'Alderwick Lending Holdings Limited',
+    'Alderwick',
+    draft(
+      [
+        ['Investments in subsidiary shares', 1_150_000],
+        ['Current amounts due from group entities', 4_535_000]
+      ],
+      [
+        ['Current amounts due to group entities', 130_000],
+        ['Non-current amounts due to group entities', 9_120_000]
+      ]
+    )
+  );
+  const spv = (id: string, n: string, from: number, to: number) =>
+    member(
+      id,
+      `Alderwick Lending SPV ${n} Limited`,
+      'Alderwick',
+      draft([['Current amounts due from group entities', from]], [['Current amounts due to group entities', to]])
+    );
+
+  it('adds up what the group is owed against what it owes, fund by fund, leaving investments out', () => {
+    const r = consolidate(
+      [
+        holdings,
+        spv('s1', '01', 100_000, 2_402_500),
+        spv('s2', '02', 100_000, 2_863_000),
+        member('s3', 'Alderwick Lending SPV 03 Limited', 'Alderwick', null)
+      ],
+      []
+    );
+    expect(r.links).toEqual([]); // with three or more funds, "the group" could be any of them: nothing is paired
+    const g = r.groupBalances!;
+    expect(g.owedTo).toBe(4_735_000);
+    expect(g.owedBy).toBe(130_000 + 9_120_000 + 2_402_500 + 2_863_000);
+    expect(g.difference).toBe(4_735_000 - 14_515_500);
+    expect(g.status).toBe('differs');
+    expect(g.funds.find((f) => f.engagementId === 'h')).toMatchObject({ owedTo: 4_535_000, owedBy: 9_250_000 });
+    expect(g.notAnalysed).toEqual(['Alderwick Lending SPV 03 Limited']);
+  });
+
+  it('agrees when the group’s receivables and payables match', () => {
+    const a = member('a', 'Parent Ltd', 'Group', draft([['Amounts due from group undertakings', 500_000]], []));
+    const b = member('b', 'Sub One Ltd', 'Group', draft([], [['Amounts due to group undertakings', 300_000]]));
+    const c = member('c', 'Sub Two Ltd', 'Group', draft([], [['Amounts due to group undertakings', 200_000]]));
+    const g = consolidate([a, b, c], []).groupBalances!;
+    expect(g).toMatchObject({ owedTo: 500_000, owedBy: 500_000, difference: 0, status: 'agrees' });
+  });
+
+  it('with two funds, "the group" is the other fund: their group balances are paired and compared', () => {
+    const a = member('a', 'Parent Ltd', 'Group', draft([['Amounts due from group entities', 500_000]], []));
+    const b = member('b', 'Sub Ltd', 'Group', draft([], [['Amounts due to group entities', 480_000]]));
+    const r = consolidate([a, b], []);
+    expect(r.links).toHaveLength(1);
+    expect(r.links[0]).toMatchObject({ status: 'differs', difference: 20_000, matchedBy: 'app' });
+    expect(r.unmatched).toEqual([]);
+  });
+
+  it('is null when no fund has a group-wide balance, and does not change pairs that name each other', () => {
+    const a = member('a', 'ABC Fund', 'ABC Funds ICAV', draft([['Amount due from ABC Lending', 1_000]], []));
+    const b = member('b', 'ABC Lending', 'ABC Lending LP', draft([], [['Amount due to ABC Fund', 1_000]]));
+    const r = consolidate([a, b], []);
+    expect(r.groupBalances).toBeNull();
+    expect(r.links).toHaveLength(1);
+    expect(r.links[0]!.status).toBe('agrees');
+  });
+
+  it('audit fixes: pairs only in a group of exactly two analysed funds, and only one line against one', () => {
+    const a = member('a', 'Parent Ltd', 'Group', draft([['Amounts due from group entities', 500_000]], []));
+    const b = member('b', 'Sub Ltd', 'Group', draft([], [['Amounts due to group entities', 300_000]]));
+    // a third fund not analysed: the group could be it, so nothing is paired
+    const three = consolidate([a, b, member('c', 'Other Ltd', 'Group', null)], []);
+    expect(three.links).toEqual([]);
+    expect(three.groupBalances!.notAnalysed).toEqual(['Other Ltd']);
+    // two lines against one: not paired line by line; the totals agree
+    const a2 = member(
+      'a',
+      'Parent Ltd',
+      'Group',
+      draft(
+        [
+          ['Current amounts due from group entities', 300_000],
+          ['Non-current amounts due from group entities', 200_000]
+        ],
+        []
+      )
+    );
+    const b2 = member('b', 'Sub Ltd', 'Group', draft([], [['Amounts due to group entities', 500_000]]));
+    const r = consolidate([a2, b2], []);
+    expect(r.links).toEqual([]);
+    expect(r.groupBalances).toMatchObject({ owedTo: 500_000, owedBy: 500_000, status: 'agrees' });
+  });
+
+  it('audit fixes: counts a line naming the other fund, the same label twice, and leaves disposal groups out', () => {
+    const a = member(
+      'a',
+      'Alpha Fund',
+      'Group',
+      draft(
+        [
+          ['Amounts due from group entities', 100],
+          ['Amounts due from group entities', 50]
+        ],
+        [['Liabilities of disposal group held for sale', 999]]
+      )
+    );
+    const b = member('b', 'Beta Fund', 'Group', draft([], [['Amount due to Alpha', 150]]));
+    const c = member('c', 'Gamma Fund', 'Group', draft([['Cash', 10]], []));
+    const g = consolidate([a, b, c], []).groupBalances!;
+    expect(g).toMatchObject({ owedTo: 150, owedBy: 150, status: 'agrees' });
+  });
+
+  it('audit fixes: different currencies are never added into one difference', () => {
+    const a = member('a', 'Parent Ltd', 'Group', draft([['Amounts due from group entities', 100]], []));
+    const b = member('b', 'Sub Ltd', 'Group', draft([], [['Amounts due to group entities', 100]]), { currency: 'USD' });
+    const c = member('c', 'Third Ltd', 'Group', draft([['Cash', 1]], []));
+    const g = consolidate([a, b, c], []).groupBalances!;
+    expect(g).toMatchObject({ currency: null, difference: null, status: 'different-currency' });
+    expect(g.funds.find((f) => f.engagementId === 'b')!.currency).toBe('USD');
+  });
+});

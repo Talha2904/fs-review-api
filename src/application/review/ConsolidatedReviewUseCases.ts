@@ -447,7 +447,8 @@ export class RunConsolidatedReview {
         unmatched: base.unmatched.filter((c) => !linked.has(c.id)),
         groups,
         summary,
-        aiNote
+        aiNote,
+        groupBalances: base.groupBalances ?? null
       };
       rec = { ...rec, status: 'done', step: rec.total, runIds, result, finishedAt: this.d.clock.nowIso() };
       await this.save(rec); // only while still running: a review given up as stuck meanwhile stays failed
