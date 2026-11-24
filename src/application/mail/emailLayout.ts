@@ -19,31 +19,46 @@ export interface EmailLayoutInput {
   notes?: string[];
   /** Small print under the card; defaults to the automatic, don't-reply line. */
   footer?: string;
-  /** The web app's address (APP_URL): the header shows the StatementX logo image from it; without it, the name in text. */
+  /** The web app's address (APP_URL): the header shows the Project Accountants mark from it (public https only). */
   appUrl?: string;
 }
 
 // The product name in every email.
 const PRODUCT = 'StatementX';
 const NO_REPLY = `Sent automatically by ${PRODUCT}. Please don’t reply to this email; replies aren’t read.`;
-const INK = '#1C1C1C';
-const MUTED = '#5B5B5B';
-const FONT = "font-family:Inter,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
-// The X of the name where the logo image cannot be shown: a darker shade of the brand teal, readable on white
-const MARK = '#2C8C80';
+// The DiligenceX email look, shared across Project Accountants apps: a navy header band (the sign-in panel's navy),
+// a white card, a pill button and Poppins, with system fonts where an email app cannot load it.
+const NAVY = '#0b1a37';
+const INK = '#14213d';
+const TEXT = '#262719';
+const MUTED = '#5b6573';
+const LINK = '#3e7cc4';
+const PAGE = '#f2f5f9';
+const LINE = '#e3e8ef';
+// The X of the StatementX wordmark: one colour from its gradient, readable on the navy band (email apps cannot draw
+// the app's animated strokes or clip gradients to text)
+const X_MARK = '#4fbfb0';
+const FONT = "font-family:Poppins,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;";
 
 /**
- * The header: the StatementX wordmark as an image (public/email-logo.png in the web app; email apps do not show
- * the app's animated SVG), with the name as its alternative text for apps that block images; then "By Project
- * Accountants". Without the app's address, the name in text.
+ * The header on the navy band: the Project Accountants mark from the app (public/pa-mark.png; only from a public https
+ * address, as an email app cannot load an image from localhost or plain http, and a broken image looks worse than
+ * none), then the StatementX wordmark in text and "By Project Accountants".
  */
 function header(appUrl?: string): string {
-  const by = `<span style="font-weight:400;color:${MUTED};"> · By Project Accountants</span>`;
-  const base = (appUrl || '').replace(/\/+$/, '');
-  if (!/^https?:\/\//.test(base))
-    return `<td style="padding:0 4px 16px;${FONT}font-size:16px;font-weight:600;color:${INK};">Statement<span style="color:${MARK};">X</span>${by}</td>`;
-  const src = escapeHtml(`${base}/email-logo.png`);
-  return `<td style="padding:0 4px 16px;${FONT}font-size:14px;line-height:22px;color:${INK};"><img src="${src}" width="128" height="22" alt="${PRODUCT}" style="display:inline-block;vertical-align:middle;border:0;outline:none;text-decoration:none;width:128px;height:22px;${FONT}font-size:16px;font-weight:600;color:${INK};">${by}</td>`;
+  let logo = '';
+  try {
+    const u = new URL(appUrl || '');
+    if (u.protocol === 'https:' && !/^(localhost|127\.|\[::1\])/.test(u.hostname)) logo = u.origin + '/pa-mark.png';
+  } catch {
+    logo = '';
+  }
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        ${logo ? `<td style="padding-right:12px;vertical-align:middle;"><img src="${escapeHtml(logo)}" width="34" height="34" alt="Project Accountants" style="display:block;border:0;border-radius:8px;"></td>` : ''}
+        <td style="vertical-align:middle;${FONT}">
+          <div style="font-size:22px;line-height:26px;font-weight:500;letter-spacing:-0.6px;color:#ffffff;">Statement<span style="color:${X_MARK};font-weight:600;">X</span></div>
+          <div style="font-size:12px;line-height:18px;color:#cfd6e2;">By Project Accountants</div>
+        </td></tr></table>`;
 }
 
 export const escapeHtml = (s: string): string =>
@@ -52,28 +67,52 @@ export const escapeHtml = (s: string): string =>
 const para = (s: string, size: number, color: string, margin: string) =>
   `<p style="margin:${margin};${FONT}font-size:${size}px;line-height:${Math.round(size * 1.6)}px;color:${color};">${escapeHtml(s).replace(/\n/g, '<br>')}</p>`;
 
+/** A full-width row of the card (tables and inline styles only: Gmail and Outlook drop most CSS). */
+const row = (inner: string, pad = '0 32px') => `<tr><td style="padding:${pad};">${inner}</td></tr>`;
+
 export function emailLayout(m: EmailLayoutInput): string {
+  // the padding sits on the cell, so the button keeps its shape where a client ignores padding on links
   const button = m.button
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 24px;"><tr><td bgcolor="${INK}" style="border-radius:8px;">
-        <a href="${escapeHtml(m.button.url)}" target="_blank" style="display:inline-block;padding:12px 24px;${FONT}font-size:15px;font-weight:600;line-height:20px;color:#ffffff;text-decoration:none;border-radius:8px;">${escapeHtml(m.button.label)}</a>
-      </td></tr></table>
-      ${para('If the button doesn’t work, copy this link into your browser:', 13, MUTED, '0 0 4px')}
-      <p style="margin:0 0 24px;${FONT}font-size:13px;line-height:20px;word-break:break-all;"><a href="${escapeHtml(m.button.url)}" target="_blank" style="color:${INK};">${escapeHtml(m.button.url)}</a></p>`
+    ? row(
+        `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" bgcolor="${INK}" style="border-radius:999px;padding:14px 30px;">
+          <a href="${escapeHtml(m.button.url)}" target="_blank" style="${FONT}font-size:15px;line-height:20px;font-weight:600;color:#ffffff;text-decoration:none;display:inline-block;">${escapeHtml(m.button.label)}</a>
+        </td></tr></table>
+      ${para('If the button doesn’t work, copy this link into your browser:', 12, MUTED, '18px 0 2px')}
+      <p style="margin:0;${FONT}font-size:12px;line-height:19px;word-break:break-all;"><a href="${escapeHtml(m.button.url)}" target="_blank" style="color:${LINK};text-decoration:underline;">${escapeHtml(m.button.url)}</a></p>`,
+        '4px 32px 24px'
+      )
+    : '';
+  const notes = (m.notes || []).length
+    ? row(
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid ${LINE};padding-top:18px;">
+        ${(m.notes || []).map((p) => para(p, 13, MUTED, '0 0 8px')).join('\n        ')}
+      </td></tr></table>`,
+        '0 32px 22px'
+      )
     : '';
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(m.heading)}</title></head>
-<body style="margin:0;padding:0;background:#F3F6FA;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(m.preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F3F6FA;"><tr><td align="center" style="padding:32px 16px;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;">
-    <tr>${header(m.appUrl)}</tr>
-    <tr><td style="background:#ffffff;border-radius:16px;padding:32px 28px;border:1px solid #E4E7EC;">
-      <h1 style="margin:0 0 16px;${FONT}font-size:22px;line-height:30px;font-weight:600;color:${INK};">${escapeHtml(m.heading)}</h1>
-      ${m.paragraphs.map((p) => para(p, 15, INK, '0 0 16px')).join('\n      ')}
-      ${button}
-      ${(m.notes || []).map((p) => para(p, 13, MUTED, '0 0 8px')).join('\n      ')}
+<html lang="en-GB"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>${escapeHtml(m.heading)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet"></head>
+<body style="margin:0;padding:0;background:${PAGE};-webkit-text-size-adjust:100%;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">${escapeHtml(m.preheader)}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${PAGE}" style="background:${PAGE};"><tr><td align="center" style="padding:32px 12px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+    <tr><td bgcolor="${NAVY}" style="background:${NAVY};border-radius:16px 16px 0 0;padding:22px 32px;">
+      ${header(m.appUrl)}
     </td></tr>
-    <tr><td style="padding:16px 4px 0;${FONT}font-size:12px;line-height:18px;color:${MUTED};">${escapeHtml(m.footer ?? NO_REPLY)}</td></tr>
+    <tr><td bgcolor="#ffffff" style="background:#ffffff;border:1px solid ${LINE};border-top:0;border-radius:0 0 16px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        ${row(
+          `<h1 style="margin:0 0 16px;${FONT}font-size:22px;line-height:30px;font-weight:600;letter-spacing:-0.2px;color:${INK};">${escapeHtml(m.heading)}</h1>
+          ${m.paragraphs.map((p) => para(p, 15, TEXT, '0 0 14px')).join('\n          ')}`,
+          '30px 32px 8px'
+        )}
+        ${button}
+        ${notes}
+      </table>
+    </td></tr>
+    <tr><td align="center" style="padding:18px 16px 0;${FONT}font-size:12px;line-height:18px;color:${MUTED};">${escapeHtml(m.footer ?? NO_REPLY)}<br>&copy; Project Accountants Ltd</td></tr>
   </table>
 </td></tr></table>
 </body></html>`;

@@ -44,7 +44,7 @@ describe('email layout', () => {
     expect(m.html).not.toContain('don’t reply');
   });
 
-  it('shows the StatementX logo image from the app, named for email apps that block images; the name in text without the app address', () => {
+  it('shows the Project Accountants mark from a public https app address, beside the StatementX wordmark in text', () => {
     const withLogo = passwordResetEmail({
       name: 'Talha',
       username: 't',
@@ -53,14 +53,18 @@ describe('email layout', () => {
       minutes: 30,
       appUrl: 'https://fs.example.com/'
     });
-    expect(withLogo.html).toContain('<img src="https://fs.example.com/email-logo.png"');
-    expect(withLogo.html).toContain('alt="StatementX"');
+    expect(withLogo.html).toContain('<img src="https://fs.example.com/pa-mark.png"');
+    expect(withLogo.html).toContain('alt="Project Accountants"');
+    expect(withLogo.html).toContain('Statement<span style="color:#4fbfb0;font-weight:600;">X</span>');
     expect(withLogo.html).toContain('By Project Accountants');
     const noLogo = reset();
     expect(noLogo.html).not.toContain('<img');
-    expect(noLogo.html).toContain('Statement<span style="color:#2C8C80;">X</span>');
+    expect(noLogo.html).toContain('Statement<span style="color:#4fbfb0;font-weight:600;">X</span>');
+    // a mail app cannot load an image from localhost or plain http: no broken image
+    for (const appUrl of ['http://fs.example.com', 'https://localhost:5173'])
+      expect(invoiceEmail({ subject: 's', message: 'm', number: 'INV-1', firmName: '', appUrl }).html).not.toContain('<img');
     expect(invoiceEmail({ subject: 's', message: 'm', number: 'INV-1', firmName: '', appUrl: 'https://fs.example.com' }).html).toContain(
-      'https://fs.example.com/email-logo.png'
+      'https://fs.example.com/pa-mark.png'
     );
   });
 });
